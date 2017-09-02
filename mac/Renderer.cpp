@@ -14,10 +14,15 @@ static void decoded(void *decompressionOutputRefCon, void *sourceFrameRefCon, OS
 }
 
 Renderer::Renderer(const std::string& host, uint16_t port)
-    : mClient(std::make_shared<SocketClient>()), mWidth(-1), mHeight(-1), mDecoder(0)
+    : mClient(std::make_shared<SocketClient>()), mWidth(-1), mHeight(-1), mDecoder(0), mH264Pid(0)
 {
-    mClient->readyRead().connect([this](const SocketClient::SharedPtr&, Buffer&& buffer) {
+    FILE* f2 = fopen("/tmp/ts.ts", "w");
+    FILE* f3 = fopen("/tmp/ts.aac", "w");
+    mClient->readyRead().connect([this, f2](const SocketClient::SharedPtr&, Buffer&& buffer) {
             //printf("got data %zu\n", buffer.size());
+            fwrite(buffer.data(), 1, buffer.size(), f2);
+            fflush(f2);
+
             mDemuxer.feed(std::move(buffer));
         });
     mClient->connected().connect([](const SocketClient::SharedPtr&) {
@@ -45,14 +50,29 @@ Renderer::Renderer(const std::string& host, uint16_t port)
 
             mWidth = info.width;
             mHeight = info.height;
+
+            if (type == TSDemux::STREAM_TYPE_VIDEO_H264)
+                mH264Pid = pid;
         });
-    mDemuxer.pkt().connect([this](const TSDemux::STREAM_PKT& pkt) {
-            if (!mDecoder) {
-                if (mWidth > 0 && mHeight > 0) {
-                    createDecoder(pkt);
-                } else {
-                    return;
+    mDemuxer.pkt().connect([this, f3](const TSDemux::STREAM_PKT& pkt) {
+            if (pkt.pid == mH264Pid) {
+                static int pktc = 0;
+                char fn[1024];
+                snprintf(fn, sizeof(fn), "/tmp/tspkt-%d.nalu", ++pktc);
+                FILE* f = fopen(fn, "w");
+                fwrite(pkt.data, 1, pkt.size, f);
+                fclose(f);
+                if (!mDecoder) {
+                    if (mWidth > 0 && mHeight > 0) {
+                        printf("PKT!!!! %d\n", pktc);
+                        createDecoder(pkt);
+                    } else {
+                        return;
+                    }
                 }
+            } else {
+                fwrite(pkt.data, 1, pkt.size, f3);
+                fflush(f3);
             }
         });
 }
@@ -73,88 +93,47 @@ Renderer::~Renderer()
 
 void Renderer::createDecoder(const TSDemux::STREAM_PKT& pkt)
 {
-    struct {
-        size_t spsOffset, ppsOffset;
-        size_t spsLength, ppsLength;
-    } parsed = { 0, 0, 0, 0 };
+    struct NaluData
+    {
+        NaluData() : data(0), size(0) { }
 
-    const unsigned char* data = pkt.data;
-    const size_t size = pkt.size;
+        void assign(const uint8_t* d, size_t s) { data = d; size = s; }
 
-    size_t start = 0, last = 0;
-    uint32_t code = 0xffffffff;
-    bool done = false;
-    while (!done && start + 3 < size) {
-        if ((code & 0xffffff00) == 0x00000100) {
-            printf("%u at %zu\n", code & 0x9f, start);
-            printf("prev %d %d %d %d(%d)\n", data[start - 4], data[start - 3], data[start - 2], data[start - 1], data[start - 1] & 0x1f);
-            last = start;
-            switch (data[start - 1] & 0x1f) {
-            case 0x01:
-            case 0x02:
-            case 0x03:
-            case 0x04:
-            case 0x05:
-                done = true;
-                break;
-            case 0x07: // SPS
-                parsed.spsOffset = start;
-                printf("WTF SPS %d\n", data[start]);
-                break;
-            case 0x08: // PPS
-                parsed.ppsOffset = start;
-                break;
-            }
+        const uint8_t* data;
+        size_t size;
+    };
+    NaluData lastSps, lastPps;
+
+    media::H264NALU nalu;
+    parser.SetStream(pkt.data, pkt.size);
+    while (true) {
+        media::H264Parser::Result result = parser.AdvanceToNextNALU(&nalu);
+        if (result == media::H264Parser::kEOStream)
+            break;
+        if (result != media::H264Parser::kOk) {
+            // bad
+            break;
         }
-        code = code << 8 | data[start++];
+        switch (nalu.nal_unit_type) {
+        case media::H264NALU::kSPS:
+            lastSps.assign(nalu.data, nalu.size);
+            break;
+        case media::H264NALU::kPPS:
+            lastPps.assign(nalu.data, nalu.size);
+            break;
+        }
     }
-    // for (int i = 3; i < size; i++) {
-    //     if (data[i] == 0x01 && data[i-1] == 0x00 && data[i-2] == 0x00 && data[i-3] == 0x00) {
-    //         if (startCodeSPSIndex == 0) {
-    //             startCodeSPSIndex = i;
-    //         }
-    //         if (i > startCodeSPSIndex) {
-    //             startCodePPSIndex = i;
-    //             break;
-    //         }
-    //     }
-    // }
 
-    if (!parsed.spsOffset || !parsed.ppsOffset) {
-        printf("no sps and/or pps found\n");
+    if (!lastSps.data || !lastPps.data) {
+        printf("no sps and/or pps\n");
         return;
     }
 
-    parsed.spsLength = parsed.ppsOffset - parsed.spsOffset - 4;
-    if (last > parsed.ppsOffset)
-        parsed.ppsLength = last - parsed.ppsOffset - 4;
-    else
-        parsed.ppsLength = size - parsed.ppsOffset;
-
-    printf("sps at %zu(%zu) and pps at %zu(%zu)\n", parsed.spsOffset, parsed.spsLength, parsed.ppsOffset, parsed.ppsLength);
-    printf("does this look right %x %x %x %x\n",
-           data[parsed.spsOffset + parsed.spsLength],
-           data[parsed.spsOffset + parsed.spsLength + 1],
-           data[parsed.spsOffset + parsed.spsLength + 2],
-           data[parsed.spsOffset + parsed.spsLength + 3]);
-    printf("and does this look right grrr %x %x %x %x\n",
-           data[parsed.spsOffset - 4],
-           data[parsed.spsOffset - 3],
-           data[parsed.spsOffset - 2],
-           data[parsed.spsOffset - 1]);
-
-    printf("SPS\n");
-    for (size_t i = 0; i < parsed.spsLength + 1; ++i)
-        printf("0x%x ", data[parsed.spsOffset + i - 1]);
-    printf("\nPPS\n");
-    for (size_t i = 0; i < parsed.ppsLength + 1; ++i)
-        printf("0x%x ", data[parsed.ppsOffset + i - 1]);
-    printf("\n");
-
     OSStatus status;
 
-    const uint8_t* const parameterSetPointers[2] = { data + parsed.spsOffset, data + parsed.ppsOffset };
-    const size_t parameterSetSizes[2] = { parsed.spsLength, parsed.ppsLength };
+    printf("sps of %zu and pps of %zu\n", lastSps.size, lastPps.size);
+    const uint8_t* const parameterSetPointers[2] = { lastSps.data, lastPps.data };
+    const size_t parameterSetSizes[2] = { lastSps.size, lastPps.size };
     status = CMVideoFormatDescriptionCreateFromH264ParameterSets(NULL,
                                                                  2,
                                                                  parameterSetPointers,
@@ -163,6 +142,7 @@ void Renderer::createDecoder(const TSDemux::STREAM_PKT& pkt)
                                                                  &mVideoFormat);
 
     if (status == noErr) {
+        printf("format descr created!\n");
         // Set the pixel attributes for the destination buffer
         CFMutableDictionaryRef destinationPixelBufferAttributes = CFDictionaryCreateMutable(
             NULL, // CFAllocatorRef allocator
@@ -201,7 +181,7 @@ void Renderer::createDecoder(const TSDemux::STREAM_PKT& pkt)
             printf("error creating session %d\n", status);
             return;
         }
-        printf("decoder created");
+        printf("decoder created\n");
     } else {
         printf("ugh, format failure %d\n", status);
     }

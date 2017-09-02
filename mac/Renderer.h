@@ -6,6 +6,7 @@
 #include <VideoToolbox.h>
 #include <rct/SocketClient.h>
 #include "Demuxer.h"
+#include "h264_parser.h"
 
 class Renderer
 {
@@ -23,6 +24,9 @@ private:
     int mWidth, mHeight;
     CMVideoFormatDescriptionRef mVideoFormat;
     VTDecompressionSessionRef mDecoder;
+    uint16_t mH264Pid;
+
+    media::H264Parser parser;
 };
 
 #endif

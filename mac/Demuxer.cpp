@@ -55,7 +55,7 @@ static void show_stream_info(TSDemux::ElementaryStream* es, uint16_t channel)
 
 const unsigned char* DemuxerImpl::ReadAV(uint64_t pos, size_t n)
 {
-    //printf("wanting %zu bytes at %llu\n", n, pos);
+    // printf("wanting %zu bytes at %llu\n", n, pos);
     assert(n <= AV_BUFFER_SIZE + 1);
     assert(pos >= lastOffset);
     size_t rem = n;
@@ -85,6 +85,7 @@ const unsigned char* DemuxerImpl::ReadAV(uint64_t pos, size_t n)
         }
     }
     //printf("skipped to %d:%zu\n", bufpos, bufoff);
+    // printf("!!!START MEMCPY\n");
     while (rem > 0) {
         if (bufpos >= demuxer->mBuffers.size()) {
             // we don't have enough data
@@ -96,6 +97,7 @@ const unsigned char* DemuxerImpl::ReadAV(uint64_t pos, size_t n)
         assert(bufoff == 0 || bufpos == 0);
         const size_t num = std::min(mbuf.size() - bufoff, rem);
         assert(rem >= num);
+        // printf("!!! SUB MEMCPY to %zu from %zu with %zu bytes\n", where, bufoff, num);
         memcpy(current.data() + where, mbuf.data() + bufoff, num);
         rem -= num;
         where += num;

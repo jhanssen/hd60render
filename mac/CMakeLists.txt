@@ -1,7 +1,7 @@
 add_subdirectory(../rct ${CMAKE_CURRENT_BINARY_DIR}/rct)
 add_subdirectory(../demux-mpegts ${CMAKE_CURRENT_BINARY_DIR}/demux-mpegts)
 
-set(SOURCES main.cpp Renderer.cpp Demuxer.cpp)
+set(SOURCES main.cpp Renderer.cpp Demuxer.cpp h264_bit_reader.cc h264_parser.cc)
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -std=c++14)
 
 find_library(FOUNDATION_LIBRARY Foundation)
