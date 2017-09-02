@@ -1,0 +1,6 @@
+[submodule "rct"]
+	path = rct
+	url = https://github.com/Andersbakken/rct.git
+[submodule "demux-mpegts"]
+	path = demux-mpegts
+	url = https://github.com/janbar/demux-mpegts.git
