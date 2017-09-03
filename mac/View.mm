@@ -87,14 +87,12 @@ public:
     ViewPrivate();
 
     void resetAudioQueue();
-    size_t enqueueBuffer(int i, const uint8_t* data, size_t size);
 
     GLView* glview;
     CVOpenGLTextureCacheRef textureCache;
     AudioQueueRef audioQueue;
     struct {
         AudioQueueBufferRef ref;
-        bool idle;
     } audioBuffers[NumAudioBuffers];
     std::vector<std::vector<uint8_t> > audioPending;
 
@@ -109,7 +107,6 @@ ViewPrivate::ViewPrivate()
 {
     for (int i = 0; i < NumAudioBuffers; ++i) {
         audioBuffers[i].ref = 0;
-        audioBuffers[i].idle = true;
     }
 }
 
@@ -137,28 +134,14 @@ void ViewPrivate::audioOutput(void *inClientData, AudioQueueRef inAQ,
         if (err != noErr)
             printf("enqueing (callback) with %zu (err %d)\n", taken, err);
     } else {
-        // no data, mark the buffer as idle
-        for (int i = 0; i < NumAudioBuffers; ++i) {
-            if (priv->audioBuffers[i].ref == inBuffer) {
-                priv->audioBuffers[i].idle = true;
-                break;
-            }
-        }
+        // add silence
+        const size_t taken = std::min<size_t>(1000, inBuffer->mAudioDataBytesCapacity);
+        memset(inBuffer->mAudioData, '\0', taken);
+        inBuffer->mAudioDataByteSize = taken;
+        OSStatus err = AudioQueueEnqueueBuffer(priv->audioQueue, inBuffer, 0, NULL);
+        if (err != noErr)
+            printf("enqueing (callback) silence (err %d)\n", err);
     }
-}
-
-size_t ViewPrivate::enqueueBuffer(int i, const uint8_t* data, size_t size)
-{
-    audioBuffers[i].idle = false;
-    auto buf = audioBuffers[i].ref;
-    const size_t taken = std::min<size_t>(buf->mAudioDataBytesCapacity, size);
-    memcpy(buf->mAudioData, data, taken);
-    buf->mAudioDataByteSize = taken;
-    OSStatus err = AudioQueueEnqueueBuffer(audioQueue, buf, 0, NULL);
-    if (err != noErr)
-        printf("enqueing %d with %zu (err %d)\n", i, taken, err);
-
-    return taken;
 }
 
 void ViewPrivate::init()
@@ -184,7 +167,6 @@ void ViewPrivate::resetAudioQueue()
         if (audioBuffers[i].ref) {
             AudioQueueFreeBuffer(audioQueue, audioBuffers[i].ref);
             audioBuffers[i].ref = 0;
-            audioBuffers[i].idle = true;
         }
     }
     if (audioQueue) {
@@ -258,16 +240,23 @@ View::View(Renderer* r)
                     }
 
                     for (int i = 0; i < NumAudioBuffers; ++i) {
+                        auto& buf = mPriv->audioBuffers[i].ref;
                         err = AudioQueueAllocateBufferWithPacketDescriptions(mPriv->audioQueue,
                                                                              format.mSampleRate * AudioBufferSeconds / 8,
                                                                              format.mSampleRate * AudioBufferSeconds / (format.mFramesPerPacket + 1),
-                                                                             &mPriv->audioBuffers[i].ref);
+                                                                             &buf);
                         if (err != noErr) {
                             printf("unable to create audio buffer %d\n", i);
                             return;
                         }
-                        printf("buffer %d cap %d\n", i, mPriv->audioBuffers[i].ref->mAudioDataBytesCapacity);
-                        // AudioQueueEnqueueBuffer(mPriv->audioQueue, mPriv->audioBuffers[i], 0, NULL);
+                        printf("buffer %d cap %d\n", i, buf->mAudioDataBytesCapacity);
+
+                        const size_t taken = std::min<size_t>(1000, buf->mAudioDataBytesCapacity);
+                        memset(buf->mAudioData, '\0', taken);
+                        buf->mAudioDataByteSize = taken;
+                        OSStatus err = AudioQueueEnqueueBuffer(mPriv->audioQueue, buf, 0, NULL);
+                        if (err != noErr)
+                            printf("enqueing %d silence (err %d)\n", i, err);
                     }
 
                     err = AudioQueueStart(mPriv->audioQueue, NULL);
@@ -279,30 +268,11 @@ View::View(Renderer* r)
                 });
         });
     mRenderer->audio().connect([this](const uint8_t* data, size_t size, uint64_t pts) {
-            printf("audio pts %llu\n", pts);
+            //printf("audio pts %llu\n", pts);
             dispatch_sync(dispatch_get_main_queue(), ^{
-            // find an idle buffer
-                    size_t off = 0;
-                    bool found;
-                    do {
-                        found = false;
-                        for (int i = 0; i < NumAudioBuffers; ++i) {
-                            if (mPriv->audioBuffers[i].idle) {
-                                const size_t taken = mPriv->enqueueBuffer(i, data + off, size - off);
-                                if (taken == size - off) {
-                                    // done
-                                    return;
-                                }
-                                found = true;
-                                off += taken;
-                            }
-                        }
-                    } while (found);
-
-                    // no idle buffers, append to audioPending
                     std::vector<uint8_t> pending;
-                    pending.resize(size - off);
-                    memcpy(&pending[0], data + off, size - off);
+                    pending.resize(size);
+                    memcpy(&pending[0], data, size);
                     mPriv->audioPending.push_back(std::move(pending));
                 });
         });
@@ -317,7 +287,7 @@ View::~View()
 void View::init()
 {
     mRenderer->image().connect([this](CVImageBufferRef cvImage, CMTime timestamp, CMTime duration, uint64_t pts) {
-            printf("image pts %llu\n", pts);
+            //printf("image pts %llu\n", pts);
             ScopedPool pool;
             CFRetain(cvImage);
             // printf("got frame\n");
