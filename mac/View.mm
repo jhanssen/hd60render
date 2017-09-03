@@ -268,6 +268,9 @@ View::View(Renderer* r)
                 });
         });
     mRenderer->audio().connect([this](const uint8_t* data, size_t size, uint64_t pts) {
+            if (!size)
+                return;
+
             //printf("audio pts %llu\n", pts);
             dispatch_sync(dispatch_get_main_queue(), ^{
                     std::vector<uint8_t> pending;
