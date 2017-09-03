@@ -16,9 +16,9 @@ static void render(Renderer* renderer)
 int main(int argc, char** argv)
 {
     Renderer renderer;
+    View view(&renderer);
 
     std::thread rendererThread(render, &renderer);
 
-    View view(&renderer);
     return view.exec();
 }

@@ -12,7 +12,7 @@ externalproject_add(
     INSTALL_COMMAND make install
     )
 
-set(SOURCES main.cpp Renderer.cpp Demuxer.cpp View.mm h264_bit_reader.cc h264_parser.cc)
+set(SOURCES main.cpp Renderer.cpp Demuxer.cpp View.mm AAC.cpp h264_bit_reader.cc h264_parser.cc)
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -std=c++14)
 
 find_library(FOUNDATION_LIBRARY Foundation)

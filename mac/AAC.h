@@ -4,6 +4,7 @@
 #include <neaacdec.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <rct/SignalSlot.h>
 
 class AAC
 {
@@ -13,8 +14,13 @@ public:
 
     void decode(const uint8_t* data, size_t size);
 
+    Signal<std::function<void(const void* samples, size_t count, size_t bps)> >& samples() { return mSamples; }
+
 private:
     NeAACDecHandle mAAC;
+    bool mInited;
+
+    Signal<std::function<void(const void* samples, size_t count, size_t bps)> > mSamples;
 };
 
 #endif

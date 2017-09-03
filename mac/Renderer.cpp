@@ -17,7 +17,8 @@ void Renderer::decoded(void *decompressionOutputRefCon, void *sourceFrameRefCon,
 }
 
 Renderer::Renderer()
-    : mClient(std::make_shared<SocketClient>()), mWidth(-1), mHeight(-1), mDecoder(0), mH264Pid(0)
+    : mClient(std::make_shared<SocketClient>()), mWidth(-1), mHeight(-1), mDecoder(0),
+      mH264Pid(0), mAACPid(0)
 {
 }
 
@@ -27,7 +28,7 @@ Renderer::~Renderer()
         VTDecompressionSessionFinishDelayedFrames(mDecoder);
         /* Block until our callback has been called with the last frame. */
         VTDecompressionSessionWaitForAsynchronousFrames(mDecoder);
-        
+
         /* Clean up. */
         VTDecompressionSessionInvalidate(mDecoder);
         CFRelease(mDecoder);
@@ -37,13 +38,7 @@ Renderer::~Renderer()
 
 void Renderer::exec(const std::string& host, uint16_t port)
 {
-    FILE* f2 = fopen("/tmp/ts.ts", "w");
-    FILE* f3 = fopen("/tmp/ts.aac", "w");
-    mClient->readyRead().connect([this, f2](const SocketClient::SharedPtr&, Buffer&& buffer) {
-            //printf("got data %zu\n", buffer.size());
-            fwrite(buffer.data(), 1, buffer.size(), f2);
-            fflush(f2);
-
+    mClient->readyRead().connect([this](const SocketClient::SharedPtr&, Buffer&& buffer) {
             mDemuxer.feed(std::move(buffer));
         });
     mClient->connected().connect([](const SocketClient::SharedPtr&) {
@@ -75,21 +70,20 @@ void Renderer::exec(const std::string& host, uint16_t port)
                 mH264Pid = pid;
 
                 mGeometryChange(mWidth, mHeight);
+            } else if (type == TSDemux::STREAM_TYPE_AUDIO_AAC_ADTS) {
+                mAACPid = pid;
+
+                mAudioChange(info);
+            } else {
+                printf("eh %d\n", type);
             }
         });
-    mDemuxer.pkt().connect([this, f3](const TSDemux::STREAM_PKT& pkt) {
+    mDemuxer.pkt().connect([this](const TSDemux::STREAM_PKT& pkt) {
             if (pkt.pid == mH264Pid) {
-                static int pktc = 0;
-                char fn[1024];
-                snprintf(fn, sizeof(fn), "/tmp/tspkt-%d.nalu", ++pktc);
-                FILE* f = fopen(fn, "w");
-                fwrite(pkt.data, 1, pkt.size, f);
-                fclose(f);
                 if (mDecoder) {
                     handlePacket(pkt);
                 } else {
                     if (mWidth > 0 && mHeight > 0) {
-                        printf("PKT!!!! %d\n", pktc);
                         createDecoder(pkt);
                         if (mDecoder)
                             handlePacket(pkt);
@@ -97,10 +91,13 @@ void Renderer::exec(const std::string& host, uint16_t port)
                         return;
                     }
                 }
-            } else {
-                fwrite(pkt.data, 1, pkt.size, f3);
-                fflush(f3);
+            } else if (pkt.pid == mAACPid) {
+                //mAudio(pkt.data, pkt.size);
+                mAAC.decode(pkt.data, pkt.size);
             }
+        });
+    mAAC.samples().connect([this](const void* samples, size_t count, size_t bps) {
+            mAudio(static_cast<const uint8_t*>(samples), count * bps);
         });
 }
 
