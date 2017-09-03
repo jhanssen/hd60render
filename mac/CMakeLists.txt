@@ -4,13 +4,18 @@ add_subdirectory(../demux-mpegts ${CMAKE_CURRENT_BINARY_DIR}/demux-mpegts)
 include(ExternalProject)
 
 externalproject_add(
-    faad2
+    faad2build
     DOWNLOAD_COMMAND ""
     SOURCE_DIR ../faad2
     CONFIGURE_COMMAND ./configure --prefix=${CMAKE_CURRENT_BINARY_DIR}/faad2 --enable-shared=no --with-xmms=no --with-mpeg4ip=no
+    BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/faad2/lib/libfaad.a
     BUILD_IN_SOURCE 1
     INSTALL_COMMAND make install
     )
+
+add_library(faad2 STATIC IMPORTED)
+set_target_properties(faad2 PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/faad2/lib/libfaad.a)
+add_dependencies(faad2 faad2build)
 
 set(SOURCES main.cpp Renderer.cpp Demuxer.cpp View.mm AAC.cpp h264_bit_reader.cc h264_parser.cc)
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -std=c++14)
@@ -50,4 +55,4 @@ include_directories(../rct rct/include ../demux-mpegts/src faad2/include
     ${COREVIDEO_INCLUDE_DIR})
 
 add_executable(mac ${SOURCES})
-target_link_libraries(mac tsDemuxerStatic ${CMAKE_CURRENT_BINARY_DIR}/faad2/lib/libfaad.a rct ${MACLIBS})
+target_link_libraries(mac tsDemuxerStatic faad2 rct ${MACLIBS})
