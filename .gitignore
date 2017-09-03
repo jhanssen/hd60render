@@ -1,6 +1,7 @@
 mac/demux-mpegts
 mac/rct
 mac/mac
+mac/faad2*
 *ninja*
 CMakeCache.txt
 CMakeFiles
