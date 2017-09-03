@@ -8,13 +8,34 @@ static inline int stream_identifier(int composition_id, int ancillary_id)
         | ((ancillary_id & 0xff) << 24);
 }
 
-static void decoded(void *decompressionOutputRefCon, void *sourceFrameRefCon, OSStatus status, VTDecodeInfoFlags infoFlags,
-                    CVImageBufferRef imageBuffer, CMTime presentationTimeStamp, CMTime presentationDuration)
+void Renderer::decoded(void *decompressionOutputRefCon, void *sourceFrameRefCon, OSStatus status, VTDecodeInfoFlags infoFlags,
+                       CVImageBufferRef imageBuffer, CMTime presentationTimeStamp, CMTime presentationDuration)
+{
+    //printf("decoded\n");
+    Renderer* r = static_cast<Renderer*>(sourceFrameRefCon);
+    r->mImage(imageBuffer, presentationTimeStamp, presentationDuration);
+}
+
+Renderer::Renderer()
+    : mClient(std::make_shared<SocketClient>()), mWidth(-1), mHeight(-1), mDecoder(0), mH264Pid(0)
 {
 }
 
-Renderer::Renderer(const std::string& host, uint16_t port)
-    : mClient(std::make_shared<SocketClient>()), mWidth(-1), mHeight(-1), mDecoder(0), mH264Pid(0)
+Renderer::~Renderer()
+{
+    if (mDecoder) {
+        VTDecompressionSessionFinishDelayedFrames(mDecoder);
+        /* Block until our callback has been called with the last frame. */
+        VTDecompressionSessionWaitForAsynchronousFrames(mDecoder);
+        
+        /* Clean up. */
+        VTDecompressionSessionInvalidate(mDecoder);
+        CFRelease(mDecoder);
+        CFRelease(mVideoFormat);
+    }
+}
+
+void Renderer::exec(const std::string& host, uint16_t port)
 {
     FILE* f2 = fopen("/tmp/ts.ts", "w");
     FILE* f3 = fopen("/tmp/ts.aac", "w");
@@ -48,11 +69,13 @@ Renderer::Renderer(const std::string& host, uint16_t port)
             printf("  Bit per sample : %d\n", info.bits_per_sample);
             printf("\n");
 
-            mWidth = info.width;
-            mHeight = info.height;
-
-            if (type == TSDemux::STREAM_TYPE_VIDEO_H264)
+            if (type == TSDemux::STREAM_TYPE_VIDEO_H264) {
+                mWidth = info.width;
+                mHeight = info.height;
                 mH264Pid = pid;
+
+                mGeometryChange(mWidth, mHeight);
+            }
         });
     mDemuxer.pkt().connect([this, f3](const TSDemux::STREAM_PKT& pkt) {
             if (pkt.pid == mH264Pid) {
@@ -62,10 +85,14 @@ Renderer::Renderer(const std::string& host, uint16_t port)
                 FILE* f = fopen(fn, "w");
                 fwrite(pkt.data, 1, pkt.size, f);
                 fclose(f);
-                if (!mDecoder) {
+                if (mDecoder) {
+                    handlePacket(pkt);
+                } else {
                     if (mWidth > 0 && mHeight > 0) {
                         printf("PKT!!!! %d\n", pktc);
                         createDecoder(pkt);
+                        if (mDecoder)
+                            handlePacket(pkt);
                     } else {
                         return;
                     }
@@ -77,18 +104,105 @@ Renderer::Renderer(const std::string& host, uint16_t port)
         });
 }
 
-Renderer::~Renderer()
+void Renderer::handlePacket(const TSDemux::STREAM_PKT& pkt)
 {
-    if (mDecoder) {
-        VTDecompressionSessionFinishDelayedFrames(mDecoder);
-        /* Block until our callback has been called with the last frame. */
-        VTDecompressionSessionWaitForAsynchronousFrames(mDecoder);
-        
-        /* Clean up. */
-        VTDecompressionSessionInvalidate(mDecoder);
-        CFRelease(mDecoder);
-        CFRelease(mVideoFormat);
+    size_t size = 0;
+    std::vector<media::H264NALU> nalus;
+    parser.SetStream(pkt.data, pkt.size);
+    while (true) {
+        media::H264NALU nalu;
+        media::H264Parser::Result result = parser.AdvanceToNextNALU(&nalu);
+        if (result == media::H264Parser::kEOStream)
+            break;
+        if (result != media::H264Parser::kOk) {
+            // bad
+            break;
+        }
+        switch (nalu.nal_unit_type) {
+        case media::H264NALU::kSPS:
+        case media::H264NALU::kSPSExt:
+        case media::H264NALU::kPPS:
+            break;
+        default:
+            size += 4 + nalu.size;
+            nalus.push_back(std::move(nalu));
+            break;
+        }
     }
+
+    if (!size)
+        return;
+
+    CMBlockBufferRef data;
+    OSStatus status = CMBlockBufferCreateWithMemoryBlock(
+        kCFAllocatorDefault,
+        NULL,                 // &memory_block
+        size,                 // block_length
+        kCFAllocatorDefault,  // block_allocator
+        NULL,                 // &custom_block_source
+        0,                    // offset_to_data
+        size,                 // data_length
+        0,                    // flags
+        &data);
+    if (status != noErr) {
+        // ugh
+        printf("couldn't create block buffer\n");
+        return;
+    }
+    size_t offset = 0;
+    for (size_t i = 0; i < nalus.size(); i++) {
+        media::H264NALU& nalu = nalus[i];
+        uint32_t header = htonl(nalu.size);
+        status = CMBlockBufferReplaceDataBytes(
+            &header, data, offset, 4);
+        if (status != noErr) {
+            printf("couldn't replace data bytes (1)\n");
+            return;
+        }
+        offset += 4;
+        status = CMBlockBufferReplaceDataBytes(nalu.data, data, offset, nalu.size);
+        if (status != noErr) {
+            printf("couldn't replace data bytes (2)\n");
+            return;
+        }
+        offset += nalu.size;
+    }
+
+    CMSampleBufferRef frame;
+    status = CMSampleBufferCreate(
+        kCFAllocatorDefault,
+        data,                 // data_buffer
+        true,                 // data_ready
+        NULL,                 // make_data_ready_callback
+        NULL,                 // make_data_ready_refcon
+        mVideoFormat,         // format_description
+        1,                    // num_samples
+        0,                    // num_sample_timing_entries
+        NULL,                 // &sample_timing_array
+        0,                    // num_sample_size_entries
+        NULL,                 // &sample_size_array
+        &frame);
+    if (status != noErr) {
+        printf("unable to create sample buffer\n");
+        CFRelease(data);
+        return;
+    }
+
+    const VTDecodeFrameFlags decode_flags =
+        kVTDecodeFrame_EnableAsynchronousDecompression;
+
+    status = VTDecompressionSessionDecodeFrame(
+        mDecoder,
+        frame,                                  // sample_buffer
+        decode_flags,                           // decode_flags
+        this,                                   // source_frame_refcon
+        NULL);                                  // &info_flags_out
+    if (status != noErr) {
+        printf("unable to decode frame\n");
+        //return;
+    }
+    CFRelease(frame);
+    CFRelease(data);
 }
 
 void Renderer::createDecoder(const TSDemux::STREAM_PKT& pkt)
@@ -150,7 +264,8 @@ void Renderer::createDecoder(const TSDemux::STREAM_PKT& pkt)
             &kCFTypeDictionaryKeyCallBacks,
             &kCFTypeDictionaryValueCallBacks);
 
-        SInt32 destinationPixelType = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange;
+        //SInt32 destinationPixelType = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange;
+        SInt32 destinationPixelType = kCVPixelFormatType_422YpCbCr8;
         CFDictionarySetValue(destinationPixelBufferAttributes, kCVPixelBufferPixelFormatTypeKey, CFNumberCreate(NULL, kCFNumberSInt32Type, &destinationPixelType));
         CFDictionarySetValue(destinationPixelBufferAttributes, kCVPixelBufferWidthKey, CFNumberCreate(NULL, kCFNumberSInt32Type, &mWidth));
         CFDictionarySetValue(destinationPixelBufferAttributes, kCVPixelBufferHeightKey, CFNumberCreate(NULL, kCFNumberSInt32Type, &mHeight));

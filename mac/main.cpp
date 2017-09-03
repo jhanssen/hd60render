@@ -1,12 +1,24 @@
 #include <rct/EventLoop.h>
+#include <thread>
 #include "Renderer.h"
+#include "View.h"
 
-int main(int argc, char** argv)
+static void render(Renderer* renderer)
 {
     auto loop = std::make_shared<EventLoop>();
     loop->init(EventLoop::MainEventLoop);
 
-    Renderer renderer("192.168.1.150", 5198);
+    renderer->exec("192.168.1.150", 5198);
 
     loop->exec();
+}
+
+int main(int argc, char** argv)
+{
+    Renderer renderer;
+
+    std::thread rendererThread(render, &renderer);
+
+    View view(&renderer);
+    return view.exec();
 }
