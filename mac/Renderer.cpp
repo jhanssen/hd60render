@@ -73,7 +73,7 @@ void Renderer::exec(const std::string& host, uint16_t port)
             } else if (type == TSDemux::STREAM_TYPE_AUDIO_AAC_ADTS) {
                 mAACPid = pid;
 
-                mAudioChange(info);
+                //mAudioChange(info);
             } else {
                 printf("eh %d\n", type);
             }
@@ -98,6 +98,9 @@ void Renderer::exec(const std::string& host, uint16_t port)
         });
     mAAC.samples().connect([this](const void* samples, size_t count, size_t bps, uint64_t pts) {
             mAudio(static_cast<const uint8_t*>(samples), count * bps, pts);
+        });
+    mAAC.info().connect([this](int rate, int channels, uint64_t pts) {
+            mAudioChange(rate, channels, pts);
         });
 }
 

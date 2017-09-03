@@ -27,6 +27,8 @@ void AAC::decode(const uint8_t* data, size_t size, uint64_t pts)
             return;
         }
         mInited = true;
+
+        mInfo(samplerate, channels, pts);
     }
 
     const uint8_t* cur = data;

@@ -97,7 +97,6 @@ public:
         bool idle;
     } audioBuffers[NumAudioBuffers];
     std::vector<std::vector<uint8_t> > audioPending;
-    bool started;
 
     void init();
 
@@ -106,7 +105,7 @@ public:
 };
 
 ViewPrivate::ViewPrivate()
-    : audioQueue(0), started(false)
+    : audioQueue(0)
 {
     for (int i = 0; i < NumAudioBuffers; ++i) {
         audioBuffers[i].ref = 0;
@@ -235,13 +234,13 @@ View::View(Renderer* r)
                 [window makeKeyAndOrderFront:window];
             });
     });
-    mRenderer->audioChange().connect([this](const TSDemux::STREAM_INFO& info) {
+    mRenderer->audioChange().connect([this](int rate, int channels, uint64_t pts) {
             AudioStreamBasicDescription format;
             memset(&format, '\0', sizeof(AudioStreamBasicDescription));
             format.mFormatID = kAudioFormatLinearPCM;
             format.mFormatFlags = kLinearPCMFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked;
-            format.mSampleRate = info.sample_rate;
-            format.mChannelsPerFrame = info.channels;
+            format.mSampleRate = rate;
+            format.mChannelsPerFrame = channels;
             format.mBitsPerChannel = 16;
             format.mBytesPerFrame = 2 * format.mChannelsPerFrame;
             format.mBytesPerPacket = 2 * format.mChannelsPerFrame;
@@ -271,13 +270,11 @@ View::View(Renderer* r)
                         // AudioQueueEnqueueBuffer(mPriv->audioQueue, mPriv->audioBuffers[i], 0, NULL);
                     }
 
-                    if (mPriv->started) {
-                        err = AudioQueueStart(mPriv->audioQueue, NULL);
-                        if (err != noErr) {
-                            printf("unable to start audio queue %d\n", err);
-                        } else {
-                            printf("audio queue started 1\n");
-                        }
+                    err = AudioQueueStart(mPriv->audioQueue, NULL);
+                    if (err != noErr) {
+                        printf("unable to start audio queue %d\n", err);
+                    } else {
+                        printf("audio queue started 1\n");
                     }
                 });
         });
@@ -360,17 +357,6 @@ int View::exec()
 {
     ScopedPool pool;
     NSApplication* app = [NSApplication sharedApplication];
-
-    if (mPriv->audioQueue) {
-        OSStatus err = AudioQueueStart(mPriv->audioQueue, NULL);
-        if (err != noErr) {
-            printf("unable to start audio queue %d\n", err);
-        } else {
-            printf("audio queue started 2\n");
-        }
-    }
-
-    mPriv->started = true;
 
     [app run];
 

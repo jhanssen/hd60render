@@ -22,7 +22,7 @@ public:
     Signal<std::function<void(int, int)> >& geometryChange() { return mGeometryChange; }
     Signal<std::function<void(CVImageBufferRef cvImage, CMTime timestamp, CMTime duration, uint64_t pts)> >& image() { return mImage; }
 
-    Signal<std::function<void(const TSDemux::STREAM_INFO&)> >& audioChange() { return mAudioChange; }
+    Signal<std::function<void(int rate, int channels, uint64_t pts)> >& audioChange() { return mAudioChange; }
     Signal<std::function<void(const uint8_t* data, size_t size, uint64_t pts)> >& audio() { return mAudio; }
 
     uint64_t currentPts() const { return mCurrentPts; }
@@ -50,7 +50,7 @@ private:
     Signal<std::function<void(int, int)> > mGeometryChange;
     Signal<std::function<void(CVImageBufferRef cvImage, CMTime timestamp, CMTime duration, uint64_t pts)> > mImage;
 
-    Signal<std::function<void(const TSDemux::STREAM_INFO&)> > mAudioChange;
+    Signal<std::function<void(int rate, int channels, uint64_t pts)> > mAudioChange;
     Signal<std::function<void(const uint8_t* data, size_t size, uint64_t pts)> > mAudio;
 };
 
