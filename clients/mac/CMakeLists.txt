@@ -1,12 +1,12 @@
-add_subdirectory(../rct ${CMAKE_CURRENT_BINARY_DIR}/rct)
-add_subdirectory(../demux-mpegts ${CMAKE_CURRENT_BINARY_DIR}/demux-mpegts)
+add_subdirectory(../../rct ${CMAKE_CURRENT_BINARY_DIR}/rct)
+add_subdirectory(../../demux-mpegts ${CMAKE_CURRENT_BINARY_DIR}/demux-mpegts)
 
 include(ExternalProject)
 
 externalproject_add(
     faad2build
     DOWNLOAD_COMMAND ""
-    SOURCE_DIR ../faad2
+    SOURCE_DIR ../../faad2
     CONFIGURE_COMMAND ./configure --prefix=${CMAKE_CURRENT_BINARY_DIR}/faad2 --enable-shared=no --with-xmms=no --with-mpeg4ip=no
     BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/faad2/lib/libfaad.a
     BUILD_IN_SOURCE 1
@@ -49,7 +49,7 @@ list(APPEND MACLIBS
     ${COREVIDEO_LIBRARY}
     )
 
-include_directories(../rct rct/include ../demux-mpegts/src faad2/include
+include_directories(../../rct rct/include ../../demux-mpegts/src faad2/include
     ${VIDEOTOOLBOX_INCLUDE_DIR}
     ${AUDIOTOOLBOX_INCLUDE_DIR}
     ${COREVIDEO_INCLUDE_DIR})
