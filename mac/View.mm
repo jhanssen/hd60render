@@ -6,7 +6,8 @@
 #include <AudioToolbox/AudioQueue.h>
 #include <vector>
 
-enum { NumAudioBuffers = 3, AudioBufferSeconds = 1 };
+static const int NumAudioBuffers = 3;
+static const float AudioBufferSeconds = 0.2;
 
 class ScopedPool
 {
@@ -135,6 +136,7 @@ void ViewPrivate::audioOutput(void *inClientData, AudioQueueRef inAQ,
             printf("enqueing (callback) with %zu (err %d)\n", taken, err);
     } else {
         // add silence
+        printf("audio underrun\n");
         const size_t taken = std::min<size_t>(1000, inBuffer->mAudioDataBytesCapacity);
         memset(inBuffer->mAudioData, '\0', taken);
         inBuffer->mAudioDataByteSize = taken;
@@ -239,11 +241,13 @@ View::View(Renderer* r)
                         return;
                     }
 
+                    const auto bufferByteSize = static_cast<uint32_t>(format.mSampleRate * AudioBufferSeconds / 8);
+
                     for (int i = 0; i < NumAudioBuffers; ++i) {
                         auto& buf = mPriv->audioBuffers[i].ref;
                         err = AudioQueueAllocateBufferWithPacketDescriptions(mPriv->audioQueue,
-                                                                             format.mSampleRate * AudioBufferSeconds / 8,
-                                                                             format.mSampleRate * AudioBufferSeconds / (format.mFramesPerPacket + 1),
+                                                                             bufferByteSize,
+                                                                             0,
                                                                              &buf);
                         if (err != noErr) {
                             printf("unable to create audio buffer %d\n", i);
