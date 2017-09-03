@@ -205,7 +205,7 @@ View::View(Renderer* r)
 
                 NSRect rect = NSMakeRect(0, 0, w, h);
                 NSWindow *window = [[NSWindow alloc] initWithContentRect:rect
-                                                               styleMask:(NSResizableWindowMask | NSClosableWindowMask | NSTitledWindowMask | NSMiniaturizableWindowMask)
+                                                               styleMask:(NSWindowStyleMaskResizable | NSWindowStyleMaskClosable | NSWindowStyleMaskTitled | NSWindowStyleMaskMiniaturizable)
                                                                  backing:NSBackingStoreBuffered defer:NO];
                 [window retain];
                 [window center];
