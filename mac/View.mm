@@ -133,8 +133,10 @@ void ViewPrivate::audioOutput(void *inClientData, AudioQueueRef inAQ,
             memmove(&data[0], &data[taken], data.size() - taken);
             data.resize(data.size() - taken);
         }
+        inBuffer->mAudioDataByteSize = taken;
         OSStatus err = AudioQueueEnqueueBuffer(priv->audioQueue, inBuffer, 0, NULL);
-        printf("enqueing (callback) with %zu (err %d)\n", taken, err);
+        if (err != noErr)
+            printf("enqueing (callback) with %zu (err %d)\n", taken, err);
     } else {
         // no data, mark the buffer as idle
         for (int i = 0; i < NumAudioBuffers; ++i) {
@@ -154,7 +156,8 @@ size_t ViewPrivate::enqueueBuffer(int i, const uint8_t* data, size_t size)
     memcpy(buf->mAudioData, data, taken);
     buf->mAudioDataByteSize = taken;
     OSStatus err = AudioQueueEnqueueBuffer(audioQueue, buf, 0, NULL);
-    printf("enqueing %d with %zu (err %d)\n", i, taken, err);
+    if (err != noErr)
+        printf("enqueing %d with %zu (err %d)\n", i, taken, err);
 
     return taken;
 }
