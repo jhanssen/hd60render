@@ -281,7 +281,8 @@ View::View(Renderer* r)
                     }
                 });
         });
-    mRenderer->audio().connect([this](const uint8_t* data, size_t size) {
+    mRenderer->audio().connect([this](const uint8_t* data, size_t size, uint64_t pts) {
+            printf("audio pts %llu\n", pts);
             dispatch_sync(dispatch_get_main_queue(), ^{
             // find an idle buffer
                     size_t off = 0;
@@ -318,7 +319,8 @@ View::~View()
 
 void View::init()
 {
-    mRenderer->image().connect([this](CVImageBufferRef cvImage, CMTime timestamp, CMTime duration) {
+    mRenderer->image().connect([this](CVImageBufferRef cvImage, CMTime timestamp, CMTime duration, uint64_t pts) {
+            printf("image pts %llu\n", pts);
             ScopedPool pool;
             CFRetain(cvImage);
             // printf("got frame\n");

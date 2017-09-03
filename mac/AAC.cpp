@@ -14,7 +14,7 @@ AAC::~AAC()
     NeAACDecClose(mAAC);
 }
 
-void AAC::decode(const uint8_t* data, size_t size)
+void AAC::decode(const uint8_t* data, size_t size, uint64_t pts)
 {
     enum { BytesPerSample = 2 }; // 16 bit sample size?
 
@@ -47,7 +47,7 @@ void AAC::decode(const uint8_t* data, size_t size)
         }
 
         //printf("decoded %lu samples\n", info.samples);
-        mSamples(output, info.samples, BytesPerSample);
+        mSamples(output, info.samples, BytesPerSample, pts);
 
         cur += info.bytesconsumed;
         rem -= info.bytesconsumed;

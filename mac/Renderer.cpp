@@ -13,12 +13,12 @@ void Renderer::decoded(void *decompressionOutputRefCon, void *sourceFrameRefCon,
 {
     //printf("decoded\n");
     Renderer* r = static_cast<Renderer*>(sourceFrameRefCon);
-    r->mImage(imageBuffer, presentationTimeStamp, presentationDuration);
+    r->mImage(imageBuffer, presentationTimeStamp, presentationDuration, r->currentPts());
 }
 
 Renderer::Renderer()
     : mClient(std::make_shared<SocketClient>()), mWidth(-1), mHeight(-1), mDecoder(0),
-      mH264Pid(0), mAACPid(0)
+      mH264Pid(0), mAACPid(0), mCurrentPts(0)
 {
 }
 
@@ -93,11 +93,11 @@ void Renderer::exec(const std::string& host, uint16_t port)
                 }
             } else if (pkt.pid == mAACPid) {
                 //mAudio(pkt.data, pkt.size);
-                mAAC.decode(pkt.data, pkt.size);
+                mAAC.decode(pkt.data, pkt.size, pkt.pts);
             }
         });
-    mAAC.samples().connect([this](const void* samples, size_t count, size_t bps) {
-            mAudio(static_cast<const uint8_t*>(samples), count * bps);
+    mAAC.samples().connect([this](const void* samples, size_t count, size_t bps, uint64_t pts) {
+            mAudio(static_cast<const uint8_t*>(samples), count * bps, pts);
         });
 }
 
@@ -105,10 +105,11 @@ void Renderer::handlePacket(const TSDemux::STREAM_PKT& pkt)
 {
     size_t size = 0;
     std::vector<media::H264NALU> nalus;
-    parser.SetStream(pkt.data, pkt.size);
+    mParser.SetStream(pkt.data, pkt.size);
+    mCurrentPts = pkt.pts;
     while (true) {
         media::H264NALU nalu;
-        media::H264Parser::Result result = parser.AdvanceToNextNALU(&nalu);
+        media::H264Parser::Result result = mParser.AdvanceToNextNALU(&nalu);
         if (result == media::H264Parser::kEOStream)
             break;
         if (result != media::H264Parser::kOk) {
@@ -216,9 +217,9 @@ void Renderer::createDecoder(const TSDemux::STREAM_PKT& pkt)
     NaluData lastSps, lastPps;
 
     media::H264NALU nalu;
-    parser.SetStream(pkt.data, pkt.size);
+    mParser.SetStream(pkt.data, pkt.size);
     while (true) {
-        media::H264Parser::Result result = parser.AdvanceToNextNALU(&nalu);
+        media::H264Parser::Result result = mParser.AdvanceToNextNALU(&nalu);
         if (result == media::H264Parser::kEOStream)
             break;
         if (result != media::H264Parser::kOk) {

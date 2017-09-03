@@ -12,15 +12,15 @@ public:
     AAC();
     ~AAC();
 
-    void decode(const uint8_t* data, size_t size);
+    void decode(const uint8_t* data, size_t size, uint64_t pts);
 
-    Signal<std::function<void(const void* samples, size_t count, size_t bps)> >& samples() { return mSamples; }
+    Signal<std::function<void(const void* samples, size_t count, size_t bps, uint64_t pts)> >& samples() { return mSamples; }
 
 private:
     NeAACDecHandle mAAC;
     bool mInited;
 
-    Signal<std::function<void(const void* samples, size_t count, size_t bps)> > mSamples;
+    Signal<std::function<void(const void* samples, size_t count, size_t bps, uint64_t pts)> > mSamples;
 };
 
 #endif
