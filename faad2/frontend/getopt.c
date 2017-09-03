@@ -169,7 +169,7 @@ static enum
 /* Avoid depending on library functions or files
    whose names are inconsistent.  */
 
-#if __STDC__ || defined(PROTO)
+#if 0 && (__STDC__ || defined(PROTO))
 extern char *getenv(const char *name);
 extern int  strcmp (const char *s1, const char *s2);
 extern int  strncmp(const char *s1, const char *s2, unsigned int n);
