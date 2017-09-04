@@ -108,7 +108,7 @@ void ServerSocket::thread(ServerSocket* server)
 	auto handleWrite = [server, &sockets]() {
 		std::unique_lock<std::mutex> locker(server->mMutex);
 		// drop everything if we have no clients
-		if (sockets.size() == 1) { // 1 for our dummy socket
+		if (sockets.size() == 2) { // 2, one is our dummy socket and one is our server socket
 			server->mBuffer.bytes.clear();
 			server->mBuffer.offset = 0;
 			server->mSocketBuffers.clear();
@@ -145,12 +145,18 @@ void ServerSocket::thread(ServerSocket* server)
 			}
 		};
 		int firstWritten = -1;
-		for (auto socket = sockets.begin(); socket != sockets.end(); ++socket) {
-			auto local = server->mSocketBuffers.find(*socket);
+		for (size_t socki = 2; socki < sockets.size(); ++socki) {
+			auto& socket = sockets[socki];
+			auto local = server->mSocketBuffers.find(socket);
 			if (local != server->mSocketBuffers.end()) {
-				int w = write(*socket, local->second);
+				int w = write(socket, local->second);
 				if (w > 0) {
 					local->second.offset += w;
+					if (local->second.offset == local->second.bytes.size()) {
+						// we've written everything, clear the buffer
+						local->second.bytes.clear();
+						local->second.offset = 0;
+					}
 					// this is suboptimal and needs to be fixed, we should really remove the buffer if we've written everything
 					// but we can't unless we know that we're in sync with the global mBuffer
 
