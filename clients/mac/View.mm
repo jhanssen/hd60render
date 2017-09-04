@@ -118,22 +118,31 @@ void ViewPrivate::audioOutput(void *inClientData, AudioQueueRef inAQ,
     ViewPrivate* priv = static_cast<ViewPrivate*>(inClientData);
     // see if we have any pending data
     if (!priv->audioPending.empty()) {
-        // can we take the entire thing?
-        auto& data = priv->audioPending.front();
-        const size_t taken = std::min<size_t>(data.size(), inBuffer->mAudioDataBytesCapacity);
-        memcpy(inBuffer->mAudioData, &data[0], taken);
-        if (taken == data.size()) {
-            // yep
-            priv->audioPending.erase(priv->audioPending.begin());
-        } else {
-            // no, we'll have to memmove sadly
-            memmove(&data[0], &data[taken], data.size() - taken);
-            data.resize(data.size() - taken);
-        }
-        inBuffer->mAudioDataByteSize = taken;
+        // take as much as possible
+        size_t total = 0;
+        do {
+            // can we take the entire current block?
+            auto& data = priv->audioPending.front();
+            const size_t taken = std::min<size_t>(data.size(), inBuffer->mAudioDataBytesCapacity - total);
+            memcpy(static_cast<uint8_t*>(inBuffer->mAudioData) + total, &data[0], taken);
+            total += taken;
+            if (taken == data.size()) {
+                // yep
+                priv->audioPending.erase(priv->audioPending.begin());
+                if (priv->audioPending.empty()) {
+                    // done
+                    break;
+                }
+            } else {
+                // no, we'll have to memmove sadly
+                memmove(&data[0], &data[taken], data.size() - taken);
+                data.resize(data.size() - taken);
+            }
+        } while (total < inBuffer->mAudioDataBytesCapacity);
+        inBuffer->mAudioDataByteSize = total;
         OSStatus err = AudioQueueEnqueueBuffer(priv->audioQueue, inBuffer, 0, NULL);
         if (err != noErr)
-            printf("enqueing (callback) with %zu (err %d)\n", taken, err);
+            printf("enqueing (callback) with %zu (err %d)\n", total, err);
     } else {
         // add silence
         printf("audio underrun\n");
