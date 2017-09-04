@@ -85,6 +85,8 @@ ServerSocket::~ServerSocket()
 
 void ServerSocket::thread(ServerSocket* server)
 {
+	enum { MaxThreshold = 30 * 1024 * 1024, MinThreshold = 20 * 1024 * 1024 };
+
 	auto serverEvent = WSACreateEvent();
 	if (serverEvent == WSA_INVALID_EVENT) {
 		// woops
@@ -166,16 +168,30 @@ void ServerSocket::thread(ServerSocket* server)
 						server->mSocketBuffers.erase(*socket);
 					}
 					*/
+				} else if (w == 0 && local->second.bytes.size() > MaxThreshold) {
+					// truncate to threshold
+					local->second.bytes.erase(local->second.bytes.begin(), local->second.bytes.end() - MinThreshold);
+				} else if (w < 0) {
+					// just erase the buffer
+					local->second.bytes.clear();
+					local->second.offset = 0;
 				}
 			}
 			else {
-				int w = write(*socket, server->mBuffer);
-				if (firstWritten == -1) {
+				int w = write(socket, server->mBuffer);
+				if (w > 0 && firstWritten == -1) {
 					firstWritten = w;
 				} else if (w > 0 && firstWritten != w) {
 					// we need to set up a new copy of the buffer
 					ServerSocket::Buffer buf = { server->mBuffer.bytes, server->mBuffer.offset + w };
-					server->mSocketBuffers[*socket] = std::move(buf);
+					server->mSocketBuffers[socket] = std::move(buf);
+				} else if (w == 0 && server->mBuffer.bytes.size() > MaxThreshold) {
+					// truncate to threshold
+					server->mBuffer.bytes.erase(server->mBuffer.bytes.begin(), server->mBuffer.bytes.end() - MinThreshold);
+				} else if (w < 0) {
+					// just erase the buffer
+					local->second.bytes.clear();
+					local->second.offset = 0;
 				}
 			}
 		}
