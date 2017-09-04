@@ -126,7 +126,7 @@ void Renderer::handlePacket(const TSDemux::STREAM_PKT& pkt)
             break;
         default:
             size += 4 + nalu.size;
-            nalus.push_back(std::move(nalu));
+            nalus.push_back(nalu);
             break;
         }
     }
