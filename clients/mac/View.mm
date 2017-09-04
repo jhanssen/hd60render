@@ -5,6 +5,7 @@
 #include <OpenGL/gl.h>
 #include <AudioToolbox/AudioQueue.h>
 #include <vector>
+#include <mutex>
 
 static const int NumAudioBuffers = 3;
 static const float AudioBufferSeconds = 0.2;
@@ -96,6 +97,7 @@ public:
     struct {
         AudioQueueBufferRef ref;
     } audioBuffers[NumAudioBuffers];
+    std::mutex audioMutex;
     std::vector<std::vector<uint8_t> > audioPending;
 
     void init();
@@ -118,6 +120,7 @@ void ViewPrivate::audioOutput(void *inClientData, AudioQueueRef inAQ,
     //printf("want audio output\n");
     ViewPrivate* priv = static_cast<ViewPrivate*>(inClientData);
     // see if we have any pending data
+    std::unique_lock<std::mutex> locker(priv->audioMutex);
     if (!priv->audioPending.empty()) {
         // take as much as possible
         size_t total = 0;
@@ -290,6 +293,7 @@ View::View(Renderer* r)
                     std::vector<uint8_t> pending;
                     pending.resize(size);
                     memcpy(&pending[0], data, size);
+                    std::unique_lock<std::mutex> locker(mPriv->audioMutex);
                     mPriv->audioPending.push_back(std::move(pending));
                 });
         });
