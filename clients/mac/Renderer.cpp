@@ -13,7 +13,7 @@ void Renderer::decoded(void *decompressionOutputRefCon, void *sourceFrameRefCon,
 {
     //printf("decoded\n");
     Renderer* r = static_cast<Renderer*>(sourceFrameRefCon);
-    r->mImage(imageBuffer, presentationTimeStamp, presentationDuration, r->currentPts());
+    r->mImage(ImageBuffer(imageBuffer), presentationTimeStamp, presentationDuration, r->currentPts());
 }
 
 Renderer::Renderer()

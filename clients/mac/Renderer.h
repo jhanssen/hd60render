@@ -19,8 +19,30 @@ public:
 
     void exec(const std::string& host, uint16_t port);
 
+    class ImageBuffer
+    {
+    public:
+        ImageBuffer();
+        ImageBuffer(ImageBuffer&& buffer);
+        ~ImageBuffer();
+
+        ImageBuffer& operator=(ImageBuffer&& other);
+        void release();
+
+        CVImageBufferRef ref() const;
+
+    private:
+        ImageBuffer(CVImageBufferRef r);
+        ImageBuffer(const ImageBuffer&) = delete;
+        ImageBuffer& operator=(const ImageBuffer&) = delete;
+
+        CVImageBufferRef mRef;
+
+        friend class Renderer;
+    };
+
     Signal<std::function<void(int, int)> >& geometryChange() { return mGeometryChange; }
-    Signal<std::function<void(CVImageBufferRef cvImage, CMTime timestamp, CMTime duration, uint64_t pts)> >& image() { return mImage; }
+    Signal<std::function<void(ImageBuffer&& image, CMTime timestamp, CMTime duration, uint64_t pts)> >& image() { return mImage; }
 
     Signal<std::function<void(int rate, int channels, uint64_t pts)> >& audioChange() { return mAudioChange; }
     Signal<std::function<void(const uint8_t* data, size_t size, uint64_t pts)> >& audio() { return mAudio; }
@@ -48,10 +70,56 @@ private:
     media::H264Parser mParser;
 
     Signal<std::function<void(int, int)> > mGeometryChange;
-    Signal<std::function<void(CVImageBufferRef cvImage, CMTime timestamp, CMTime duration, uint64_t pts)> > mImage;
+    Signal<std::function<void(ImageBuffer&& image, CMTime timestamp, CMTime duration, uint64_t pts)> > mImage;
 
     Signal<std::function<void(int rate, int channels, uint64_t pts)> > mAudioChange;
     Signal<std::function<void(const uint8_t* data, size_t size, uint64_t pts)> > mAudio;
 };
+
+inline Renderer::ImageBuffer::ImageBuffer()
+    : mRef(0)
+{
+}
+
+inline Renderer::ImageBuffer::ImageBuffer(CVImageBufferRef r)
+{
+    mRef = r;
+    if (mRef)
+        CVPixelBufferRetain(mRef);
+}
+
+inline Renderer::ImageBuffer::ImageBuffer(ImageBuffer&& buffer)
+    : mRef(buffer.mRef)
+{
+    buffer.mRef = 0;
+}
+
+inline Renderer::ImageBuffer::~ImageBuffer()
+{
+    if (mRef)
+        CVPixelBufferRelease(mRef);
+}
+
+inline Renderer::ImageBuffer& Renderer::ImageBuffer::operator=(ImageBuffer&& other)
+{
+    if (mRef)
+        CVPixelBufferRelease(mRef);
+    mRef = other.mRef;
+    other.mRef = 0;
+    return *this;
+}
+
+inline CVImageBufferRef Renderer::ImageBuffer::ref() const
+{
+    return mRef;
+}
+
+inline void Renderer::ImageBuffer::release()
+{
+    if (mRef) {
+        CVPixelBufferRelease(mRef);
+        mRef = 0;
+    }
+}
 
 #endif

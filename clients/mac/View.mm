@@ -36,6 +36,7 @@ static void drawTexture()
 @interface GLView : NSOpenGLView
 {
     @public CVOpenGLTextureRef texture;
+    @public Renderer::ImageBuffer image;
     @public int width;
     @public int height;
 }
@@ -302,10 +303,9 @@ View::~View()
 
 void View::init()
 {
-    mRenderer->image().connect([this](CVImageBufferRef cvImage, CMTime timestamp, CMTime duration, uint64_t pts) {
+    mRenderer->image().connect([this](Renderer::ImageBuffer&& image, CMTime timestamp, CMTime duration, uint64_t pts) {
             //printf("image pts %llu\n", pts);
             ScopedPool pool;
-            CFRetain(cvImage);
             // printf("got frame\n");
             dispatch_sync(dispatch_get_main_queue(), ^{
                     ScopedPool pool;
@@ -315,7 +315,7 @@ void View::init()
                         CVOpenGLTextureRef texture;
                         err = CVOpenGLTextureCacheCreateTextureFromImage(kCFAllocatorDefault,
                                                                          mPriv->textureCache,
-                                                                         cvImage,
+                                                                         image.ref(),
                                                                          NULL,
                                                                          &texture);
                         if (err != kCVReturnSuccess) {
@@ -327,10 +327,9 @@ void View::init()
                             CVOpenGLTextureCacheFlush(mPriv->textureCache, 0);
                         }
                         //printf("image!\n");
+                        mPriv->glview->image = std::move(image);
                         mPriv->glview->texture = texture;
                         [mPriv->glview setNeedsDisplay:YES];
-
-                        CFRelease(cvImage);
                     }
                     @catch (NSException *exception) {
                         NSLog(@"%@", [exception reason]);
