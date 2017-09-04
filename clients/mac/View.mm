@@ -53,7 +53,7 @@ static void drawTexture()
         glClearColor(0, 0, 0, 0);
         glClear(GL_COLOR_BUFFER_BIT);
         if (texture) {
-            GLfloat		texMatrix[16]	= {0};
+            GLfloat		texMatrix[16] = {0};
             GLint		saveMatrixMode;
 
             // Reverses and normalizes the texture
@@ -65,7 +65,6 @@ static void drawTexture()
 
             glGetIntegerv(GL_MATRIX_MODE, &saveMatrixMode);
             glMatrixMode(GL_TEXTURE);
-            glPushMatrix();
             glLoadMatrixf(texMatrix);
             glMatrixMode(saveMatrixMode);
 
@@ -81,6 +80,19 @@ static void drawTexture()
     @catch (NSException *exception) {
         NSLog(@"%@", [exception reason]);
     }
+}
+@end
+
+@interface WindowController : NSWindowController <NSWindowDelegate> {
+    @public GLView* view;
+    @public NSWindow* window;
+}
+@end
+
+@implementation WindowController
+- (void)windowDidResize:(NSNotification *)notification {
+    glViewport(0, 0, window.frame.size.width, window.frame.size.height);
+    [view setNeedsDisplay:YES];
 }
 @end
 
@@ -207,6 +219,10 @@ View::View(Renderer* r)
                 [window center];
                 [window setCollectionBehavior:NSWindowCollectionBehaviorFullScreenPrimary];
 
+                WindowController* controller = [[WindowController alloc] init];
+                controller->window = window;
+                [window setDelegate:controller];
+
                 NSView* content_view = [window contentView];
                 [content_view setAutoresizesSubviews:YES];
                 GLView* glview = [[[GLView alloc]
@@ -215,6 +231,8 @@ View::View(Renderer* r)
                 [glview setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
                 [content_view addSubview:glview];
                 [glview retain];
+
+                controller->view = glview;
 
                 glview->texture = 0;
                 glview->width = w;
