@@ -246,7 +246,14 @@ bool Options::enabled(const char* arg) const
     Option opt(arg);
     auto v = values.find(opt.longOption);
     if (v == values.end()) {
-        return false;
+        if (opt.hasShort) {
+            v = values.find(opt.shortOption);
+            if (v == values.end()) {
+                return false;
+            }
+        } else {
+            return false;
+        }
     }
     const bool* ok = std::get_if<bool>(&v->second);
     if (ok) {
