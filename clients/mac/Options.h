@@ -147,7 +147,6 @@ Options::Options(int argc, char** argv)
                     } else {
                         if (eqpos != std::string::npos) {
                             values[optstr] = makeValue(valstr);
-                            hadopt.clear();
                         } else {
                             hadopt = optstr;
                         }
