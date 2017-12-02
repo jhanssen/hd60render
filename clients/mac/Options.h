@@ -186,7 +186,7 @@ Options Options::parse(int argc, char** argv)
 bool Options::has(const char* arg) const
 {
     Option opt(arg);
-    return values.count(opt.longOption) > 0 || (opt.hasShort && values.count(opt.shortOption));
+    return values.count(opt.longOption) > 0 || (opt.hasShort && values.count(opt.shortOption) > 0);
 }
 
 template<typename Type>
