@@ -26,6 +26,8 @@ public:
     struct Standalones
     {
         size_t size() const;
+        template<typename Type>
+        bool is(size_t idx) const;
         Value at(size_t idx) const;
         template<typename Type>
         Type at(size_t idx) const;
@@ -245,6 +247,15 @@ bool Options::enabled(const char* arg) const
 size_t Options::Standalones::size() const
 {
     return standalones.size();
+}
+
+template<typename Type>
+bool Options::Standalones::is(size_t idx) const
+{
+    if (idx >= standalones.size())
+        return false;
+    const auto ptr = std::get_if<Type>(&standalones[idx]);
+    return ptr != nullptr;
 }
 
 Options::Value Options::Standalones::at(size_t idx) const
