@@ -14,7 +14,13 @@
 class Renderer
 {
 public:
-    Renderer();
+    struct Options
+    {
+        std::string host;
+        uint16_t port;
+    };
+
+    Renderer(Options opts);
     ~Renderer();
 
     void exec(const std::string& host, uint16_t port);
@@ -49,6 +55,8 @@ public:
 
     uint64_t currentPts() const { return mCurrentPts; }
 
+    const Options& options() const { return mOptions; }
+
 private:
     void createDecoder(const TSDemux::STREAM_PKT& pkt);
     void handlePacket(const TSDemux::STREAM_PKT& pkt);
@@ -57,6 +65,7 @@ private:
                         CVImageBufferRef imageBuffer, CMTime presentationTimeStamp, CMTime presentationDuration);
 
 private:
+    Options mOptions;
     std::shared_ptr<SocketClient> mClient;
     Demuxer mDemuxer;
     AAC mAAC;

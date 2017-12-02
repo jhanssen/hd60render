@@ -16,9 +16,9 @@ void Renderer::decoded(void *decompressionOutputRefCon, void *sourceFrameRefCon,
     r->mImage(ImageBuffer(imageBuffer), presentationTimeStamp, presentationDuration, r->currentPts());
 }
 
-Renderer::Renderer()
-    : mClient(std::make_shared<SocketClient>()), mWidth(-1), mHeight(-1), mDecoder(0),
-      mH264Pid(0), mAACPid(0), mCurrentPts(0)
+Renderer::Renderer(Options opts)
+    : mOptions(opts), mClient(std::make_shared<SocketClient>()), mWidth(-1), mHeight(-1),
+      mDecoder(0), mH264Pid(0), mAACPid(0), mCurrentPts(0)
 {
 }
 
