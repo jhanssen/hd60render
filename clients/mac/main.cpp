@@ -9,7 +9,7 @@ static void render(Renderer* renderer)
     auto loop = std::make_shared<EventLoop>();
     loop->init(EventLoop::MainEventLoop);
 
-    renderer->exec(renderer->options().host, renderer->options().port);
+    renderer->exec();
 
     loop->exec();
 }

@@ -36,7 +36,7 @@ Renderer::~Renderer()
     }
 }
 
-void Renderer::exec(const std::string& host, uint16_t port)
+void Renderer::exec()
 {
     mClient->readyRead().connect([this](const SocketClient::SharedPtr&, Buffer&& buffer) {
             mDemuxer.feed(std::move(buffer));
@@ -44,7 +44,7 @@ void Renderer::exec(const std::string& host, uint16_t port)
     mClient->connected().connect([](const SocketClient::SharedPtr&) {
             printf("connected\n");
         });
-    mClient->connect(host, port);
+    mClient->connect(mOptions.host, mOptions.port);
 
     mDemuxer.info().connect([this](uint16_t pid, TSDemux::STREAM_TYPE type, const TSDemux::STREAM_INFO& info) {
             printf("dump stream infos for PID %.4x\n", pid);

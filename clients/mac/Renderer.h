@@ -23,7 +23,7 @@ public:
     Renderer(Options opts);
     ~Renderer();
 
-    void exec(const std::string& host, uint16_t port);
+    void exec();
 
     class ImageBuffer
     {
@@ -54,8 +54,6 @@ public:
     Signal<std::function<void(const uint8_t* data, size_t size, uint64_t pts)> >& audio() { return mAudio; }
 
     uint64_t currentPts() const { return mCurrentPts; }
-
-    const Options& options() const { return mOptions; }
 
 private:
     void createDecoder(const TSDemux::STREAM_PKT& pkt);
