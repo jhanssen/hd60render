@@ -254,8 +254,7 @@ bool Options::Standalones::is(size_t idx) const
 {
     if (idx >= standalones.size())
         return false;
-    const auto ptr = std::get_if<Type>(&standalones[idx]);
-    return ptr != nullptr;
+    return std::holds_alternative<Type>(standalones[idx]);
 }
 
 Options::Value Options::Standalones::at(size_t idx) const
