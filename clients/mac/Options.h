@@ -40,17 +40,21 @@ public:
     const Standalones& standalones() { return standaloneValues; }
 
 private:
+    typedef std::unordered_map<std::string, Value> Values;
+
     struct Option
     {
         Option(const char* arg);
 
         std::string longOption, shortOption;
         bool hasShort;
+
+        Values::const_iterator find(const Values& v) const;
     };
 
     Options(int argc, char** argv);
 
-    std::unordered_map<std::string, Value> values;
+    Values values;
     Standalones standaloneValues;
 };
 
@@ -67,6 +71,16 @@ Options::Option::Option(const char* arg)
             shortOption = longOption[idx];
         }
     }
+}
+
+Options::Values::const_iterator Options::Option::find(const Values& values) const
+{
+    auto v = values.find(longOption);
+    if (v == values.end()) {
+        if (hasShort)
+            return values.find(shortOption);
+    }
+    return v;
 }
 
 Options::Options(int argc, char** argv)
@@ -179,17 +193,9 @@ template<typename Type>
 bool Options::has(const char* arg) const
 {
     Option opt(arg);
-    auto v = values.find(opt.longOption);
-    if (v == values.end()) {
-        if (opt.hasShort) {
-            v = values.find(opt.shortOption);
-            if (v == values.end()) {
-                return false;
-            }
-        } else {
-            return false;
-        }
-    }
+    auto v = opt.find(values);
+    if (v == values.end())
+        return false;
     return std::holds_alternative<Type>(v->second);
 }
 
@@ -202,17 +208,9 @@ bool Options::has<int>(const char* arg) const
 Options::Value Options::value(const char* arg) const
 {
     Option opt(arg);
-    auto v = values.find(opt.longOption);
-    if (v == values.end()) {
-        if (opt.hasShort) {
-            v = values.find(opt.shortOption);
-            if (v == values.end()) {
-                std::throw_with_nested(std::runtime_error("no such value"));
-            }
-        } else {
-            std::throw_with_nested(std::runtime_error("no such value"));
-        }
-    }
+    auto v = opt.find(values);
+    if (v == values.end())
+        std::throw_with_nested(std::runtime_error("no such value"));
     return v->second;
 }
 
@@ -220,17 +218,9 @@ template<typename Type>
 Type Options::value(const char* arg) const
 {
     Option opt(arg);
-    auto v = values.find(opt.longOption);
-    if (v == values.end()) {
-        if (opt.hasShort) {
-            v = values.find(opt.shortOption);
-            if (v == values.end()) {
-                std::throw_with_nested(std::runtime_error("no such value"));
-            }
-        } else {
-            std::throw_with_nested(std::runtime_error("no such value"));
-        }
-    }
+    auto v = opt.find(values);
+    if (v == values.end())
+        std::throw_with_nested(std::runtime_error("no such value"));
     return std::get<Type>(v->second);
 }
 
@@ -243,21 +233,12 @@ int Options::value<int>(const char* arg) const
 bool Options::enabled(const char* arg) const
 {
     Option opt(arg);
-    auto v = values.find(opt.longOption);
-    if (v == values.end()) {
-        if (opt.hasShort) {
-            v = values.find(opt.shortOption);
-            if (v == values.end()) {
-                return false;
-            }
-        } else {
-            return false;
-        }
-    }
+    auto v = opt.find(values);
+    if (v == values.end())
+        return false;
     const bool* ok = std::get_if<bool>(&v->second);
-    if (ok) {
+    if (ok)
         return *ok;
-    }
     return false;
 }
 
