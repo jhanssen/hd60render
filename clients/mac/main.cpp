@@ -32,7 +32,6 @@ int main(int argc, char** argv)
     } else {
         renderOptions.port = 5198;
     }
-    printf("faff %d\n", options.enabled("&verbose"));
     if (options.enabled("&verbose")) {
         log::addSink(
             [](const std::string& msg) {
