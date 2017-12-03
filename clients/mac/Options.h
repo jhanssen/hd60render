@@ -178,6 +178,11 @@ Options::Options(int argc, char** argv)
             }
         }
     }
+
+    if (!hadopt.empty()) {
+        values[hadopt] = Value{true};
+        hadopt.clear();
+    }
 }
 
 Options Options::parse(int argc, char** argv)
