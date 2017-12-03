@@ -33,7 +33,7 @@ int main(int argc, char** argv)
         renderOptions.port = 5198;
     }
     const bool verbose = options.enabled("&verbose");
-    log::addSink(
+    Log::addSink(
         [verbose](const std::string& msg) {
             if (verbose) {
                 std::fprintf(stdout, "%s", msg.c_str());

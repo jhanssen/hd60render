@@ -43,27 +43,27 @@ void Renderer::exec()
             mDemuxer.feed(std::move(buffer));
         });
     mClient->connected().connect([](const SocketClient::SharedPtr&) {
-            log::stdout("connected\n");
+            Log::stdout("connected\n");
         });
     mClient->connect(mOptions.host, mOptions.port);
 
     mDemuxer.info().connect([this](uint16_t pid, TSDemux::STREAM_TYPE type, const TSDemux::STREAM_INFO& info) {
-            log::stdout("dump stream infos for PID %\n", pid);
-            log::stdout("  Codec name     : %\n", TSDemux::ElementaryStream::GetStreamCodecName(type));
-            log::stdout("  Language       : %\n", info.language);
-            log::stdout("  Identifier     : %\n", stream_identifier(info.composition_id, info.ancillary_id));
-            log::stdout("  FPS scale      : %\n", info.fps_scale);
-            log::stdout("  FPS rate       : %\n", info.fps_rate);
-            log::stdout("  Interlaced     : %\n", (info.interlaced ? "true" : "false"));
-            log::stdout("  Height         : %\n", info.height);
-            log::stdout("  Width          : %\n", info.width);
-            log::stdout("  Aspect         : %\n", info.aspect);
-            log::stdout("  Channels       : %\n", info.channels);
-            log::stdout("  Sample rate    : %\n", info.sample_rate);
-            log::stdout("  Block align    : %\n", info.block_align);
-            log::stdout("  Bit rate       : %\n", info.bit_rate);
-            log::stdout("  Bit per sample : %\n", info.bits_per_sample);
-            log::stdout("\n");
+            Log::stdout("dump stream infos for PID %\n", pid);
+            Log::stdout("  Codec name     : %\n", TSDemux::ElementaryStream::GetStreamCodecName(type));
+            Log::stdout("  Language       : %\n", info.language);
+            Log::stdout("  Identifier     : %\n", stream_identifier(info.composition_id, info.ancillary_id));
+            Log::stdout("  FPS scale      : %\n", info.fps_scale);
+            Log::stdout("  FPS rate       : %\n", info.fps_rate);
+            Log::stdout("  Interlaced     : %\n", (info.interlaced ? "true" : "false"));
+            Log::stdout("  Height         : %\n", info.height);
+            Log::stdout("  Width          : %\n", info.width);
+            Log::stdout("  Aspect         : %\n", info.aspect);
+            Log::stdout("  Channels       : %\n", info.channels);
+            Log::stdout("  Sample rate    : %\n", info.sample_rate);
+            Log::stdout("  Block align    : %\n", info.block_align);
+            Log::stdout("  Bit rate       : %\n", info.bit_rate);
+            Log::stdout("  Bit per sample : %\n", info.bits_per_sample);
+            Log::stdout("\n");
 
             if (type == TSDemux::STREAM_TYPE_VIDEO_H264) {
                 mWidth = info.width;
@@ -76,7 +76,7 @@ void Renderer::exec()
 
                 //mAudioChange(info);
             } else {
-                log::stdout("eh %\n", type);
+                Log::stdout("eh %\n", type);
                 //printf("eh %d\n", type);
             }
         });
@@ -149,7 +149,7 @@ void Renderer::handlePacket(const TSDemux::STREAM_PKT& pkt)
         &data);
     if (status != noErr) {
         // ugh
-        log::stderr("couldn't create block buffer\n");
+        Log::stderr("couldn't create block buffer\n");
         return;
     }
     size_t offset = 0;
@@ -159,13 +159,13 @@ void Renderer::handlePacket(const TSDemux::STREAM_PKT& pkt)
         status = CMBlockBufferReplaceDataBytes(
             &header, data, offset, 4);
         if (status != noErr) {
-            log::stderr("couldn't replace data bytes (1)\n");
+            Log::stderr("couldn't replace data bytes (1)\n");
             return;
         }
         offset += 4;
         status = CMBlockBufferReplaceDataBytes(nalu.data, data, offset, nalu.size);
         if (status != noErr) {
-            log::stderr("couldn't replace data bytes (2)\n");
+            Log::stderr("couldn't replace data bytes (2)\n");
             return;
         }
         offset += nalu.size;
@@ -186,7 +186,7 @@ void Renderer::handlePacket(const TSDemux::STREAM_PKT& pkt)
         NULL,                 // &sample_size_array
         &frame);
     if (status != noErr) {
-        log::stderr("unable to create sample buffer\n");
+        Log::stderr("unable to create sample buffer\n");
         CFRelease(data);
         return;
     }
@@ -201,7 +201,7 @@ void Renderer::handlePacket(const TSDemux::STREAM_PKT& pkt)
         this,                                   // source_frame_refcon
         NULL);                                  // &info_flags_out
     if (status != noErr) {
-        log::stderr("unable to decode frame\n");
+        Log::stderr("unable to decode frame\n");
         //return;
     }
     CFRelease(frame);
@@ -242,13 +242,13 @@ void Renderer::createDecoder(const TSDemux::STREAM_PKT& pkt)
     }
 
     if (!lastSps.data || !lastPps.data) {
-        log::stderr("no sps and/or pps\n");
+        Log::stderr("no sps and/or pps\n");
         return;
     }
 
     OSStatus status;
 
-    log::stdout("sps of % and pps of %\n", lastSps.size, lastPps.size);
+    Log::stdout("sps of % and pps of %\n", lastSps.size, lastPps.size);
     const uint8_t* const parameterSetPointers[2] = { lastSps.data, lastPps.data };
     const size_t parameterSetSizes[2] = { lastSps.size, lastPps.size };
     status = CMVideoFormatDescriptionCreateFromH264ParameterSets(NULL,
@@ -259,7 +259,7 @@ void Renderer::createDecoder(const TSDemux::STREAM_PKT& pkt)
                                                                  &mVideoFormat);
 
     if (status == noErr) {
-        log::stdout("format descr created!\n");
+        Log::stdout("format descr created!\n");
         // Set the pixel attributes for the destination buffer
         CFMutableDictionaryRef destinationPixelBufferAttributes = CFDictionaryCreateMutable(
             NULL, // CFAllocatorRef allocator
@@ -296,11 +296,11 @@ void Renderer::createDecoder(const TSDemux::STREAM_PKT& pkt)
 
         // Check the Status
         if(status != noErr) {
-            log::stderr("error creating session %\n", status);
+            Log::stderr("error creating session %\n", status);
             return;
         }
-        log::stdout("decoder created\n");
+        Log::stdout("decoder created\n");
     } else {
-        log::stderr("ugh, format failure %\n", status);
+        Log::stderr("ugh, format failure %\n", status);
     }
 }

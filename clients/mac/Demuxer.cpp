@@ -36,22 +36,22 @@ static void show_stream_info(TSDemux::ElementaryStream* es, uint16_t channel)
     if (!es)
         return;
 
-    log::stdout("dump stream infos for channel % PID %\n", channel, es->pid);
-    log::stdout("  Codec name     : %\n", es->GetStreamCodecName());
-    log::stdout("  Language       : %\n", es->stream_info.language);
-    log::stdout("  Identifier     : %\n", stream_identifier(es->stream_info.composition_id, es->stream_info.ancillary_id));
-    log::stdout("  FPS scale      : %\n", es->stream_info.fps_scale);
-    log::stdout("  FPS rate       : %\n", es->stream_info.fps_rate);
-    log::stdout("  Interlaced     : %\n", (es->stream_info.interlaced ? "true" : "false"));
-    log::stdout("  Height         : %\n", es->stream_info.height);
-    log::stdout("  Width          : %\n", es->stream_info.width);
-    log::stdout("  Aspect         : %\n", es->stream_info.aspect);
-    log::stdout("  Channels       : %\n", es->stream_info.channels);
-    log::stdout("  Sample rate    : %\n", es->stream_info.sample_rate);
-    log::stdout("  Block align    : %\n", es->stream_info.block_align);
-    log::stdout("  Bit rate       : %\n", es->stream_info.bit_rate);
-    log::stdout("  Bit per sample : %\n", es->stream_info.bits_per_sample);
-    log::stdout("\n");
+    Log::stdout("dump stream infos for channel % PID %\n", channel, es->pid);
+    Log::stdout("  Codec name     : %\n", es->GetStreamCodecName());
+    Log::stdout("  Language       : %\n", es->stream_info.language);
+    Log::stdout("  Identifier     : %\n", stream_identifier(es->stream_info.composition_id, es->stream_info.ancillary_id));
+    Log::stdout("  FPS scale      : %\n", es->stream_info.fps_scale);
+    Log::stdout("  FPS rate       : %\n", es->stream_info.fps_rate);
+    Log::stdout("  Interlaced     : %\n", (es->stream_info.interlaced ? "true" : "false"));
+    Log::stdout("  Height         : %\n", es->stream_info.height);
+    Log::stdout("  Width          : %\n", es->stream_info.width);
+    Log::stdout("  Aspect         : %\n", es->stream_info.aspect);
+    Log::stdout("  Channels       : %\n", es->stream_info.channels);
+    Log::stdout("  Sample rate    : %\n", es->stream_info.sample_rate);
+    Log::stdout("  Block align    : %\n", es->stream_info.block_align);
+    Log::stdout("  Bit rate       : %\n", es->stream_info.bit_rate);
+    Log::stdout("  Bit per sample : %\n", es->stream_info.bits_per_sample);
+    Log::stdout("\n");
 }
 
 const unsigned char* DemuxerImpl::ReadAV(uint64_t pos, size_t n)
@@ -175,7 +175,7 @@ void Demuxer::feed(Buffer&& buffer)
             ret = mAVContext->ProcessTSPayload();
             if (ret == TSDemux::AVCONTEXT_PROGRAM_CHANGE) {
                 // hey
-                log::stdout("program change\n");
+                Log::stdout("program change\n");
                 const std::vector<TSDemux::ElementaryStream*> streams = mAVContext->GetStreams();
                 for (std::vector<TSDemux::ElementaryStream*>::const_iterator it = streams.begin(); it != streams.end(); ++it) {
                     mAVContext->StartStreaming((*it)->pid);
