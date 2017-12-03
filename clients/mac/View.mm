@@ -1,5 +1,6 @@
 #include "View.h"
 #include "Renderer.h"
+#include "Log.h"
 
 #import <Cocoa/Cocoa.h>
 #include <OpenGL/gl.h>
@@ -157,17 +158,19 @@ void ViewPrivate::audioOutput(void *inClientData, AudioQueueRef inAQ,
         } while (total < inBuffer->mAudioDataBytesCapacity);
         inBuffer->mAudioDataByteSize = total;
         OSStatus err = AudioQueueEnqueueBuffer(priv->audioQueue, inBuffer, 0, NULL);
-        if (err != noErr)
-            printf("enqueing (callback) with %zu (err %d)\n", total, err);
+        if (err != noErr) {
+            log::stderr("enqueing (callback) with % (err %)\n", total, err);
+        }
     } else {
         // add silence
-        printf("audio underrun\n");
+        log::stdout("audio underrun\n");
         const size_t taken = std::min<size_t>(1000, inBuffer->mAudioDataBytesCapacity);
         memset(inBuffer->mAudioData, '\0', taken);
         inBuffer->mAudioDataByteSize = taken;
         OSStatus err = AudioQueueEnqueueBuffer(priv->audioQueue, inBuffer, 0, NULL);
-        if (err != noErr)
-            printf("enqueing (callback) silence (err %d)\n", err);
+        if (err != noErr) {
+            log::stderr("enqueing (callback) silence (err %)\n", err);
+        }
     }
 }
 
@@ -183,13 +186,13 @@ void ViewPrivate::init()
                                      0,
                                      &textureCache);
     if (err != kCVReturnSuccess) {
-        printf("failed to create texture cache %d\n", err);
+        log::stderr("failed to create texture cache %\n", err);
     }
 }
 
 void ViewPrivate::resetAudioQueue()
 {
-    printf("!! audio queue reset\n");
+    log::stdout("!! audio queue reset\n");
     for (int i = 0; i < NumAudioBuffers; ++i) {
         if (audioBuffers[i].ref) {
             AudioQueueFreeBuffer(audioQueue, audioBuffers[i].ref);
@@ -243,7 +246,7 @@ View::View(Renderer* r)
 
                 this->init();
 
-                printf("view created\n");
+                log::stdout("view created\n");
 
                 [app activateIgnoringOtherApps:YES];
                 [window makeKeyAndOrderFront:window];
@@ -260,7 +263,7 @@ View::View(Renderer* r)
             format.mBytesPerFrame = 2 * format.mChannelsPerFrame;
             format.mBytesPerPacket = 2 * format.mChannelsPerFrame;
             format.mFramesPerPacket = 1;
-            printf("audio change\n");
+            log::stdout("audio change\n");
 
             dispatch_sync(dispatch_get_main_queue(), ^{
                     mPriv->resetAudioQueue();
@@ -268,7 +271,7 @@ View::View(Renderer* r)
                     OSStatus err;
                     err = AudioQueueNewOutput(&format, ViewPrivate::audioOutput, mPriv, NULL, NULL, 0, &mPriv->audioQueue);
                     if (err != noErr) {
-                        printf("unable to create new audio queue\n");
+                        log::stderr("unable to create new audio queue\n");
                         return;
                     }
 
@@ -281,24 +284,25 @@ View::View(Renderer* r)
                                                                              0,
                                                                              &buf);
                         if (err != noErr) {
-                            printf("unable to create audio buffer %d\n", i);
+                            log::stderr("unable to create audio buffer %\n", i);
                             return;
                         }
-                        printf("buffer %d cap %d\n", i, buf->mAudioDataBytesCapacity);
+                        log::stdout("buffer % cap %\n", i, buf->mAudioDataBytesCapacity);
 
                         const size_t taken = std::min<size_t>(1000, buf->mAudioDataBytesCapacity);
                         memset(buf->mAudioData, '\0', taken);
                         buf->mAudioDataByteSize = taken;
                         OSStatus err = AudioQueueEnqueueBuffer(mPriv->audioQueue, buf, 0, NULL);
-                        if (err != noErr)
-                            printf("enqueing %d silence (err %d)\n", i, err);
+                        if (err != noErr) {
+                            log::stderr("enqueing % silence (err %)\n", i, err);
+                        }
                     }
 
                     err = AudioQueueStart(mPriv->audioQueue, NULL);
                     if (err != noErr) {
-                        printf("unable to start audio queue %d\n", err);
+                        log::stderr("unable to start audio queue %\n", err);
                     } else {
-                        printf("audio queue started 1\n");
+                        log::stdout("audio queue started 1\n");
                     }
                 });
         });
@@ -341,7 +345,7 @@ void View::init()
                                                                          NULL,
                                                                          &texture);
                         if (err != kCVReturnSuccess) {
-                            printf("failed to create texture %d\n", err);
+                            log::stderr("failed to create texture %\n", err);
                             return;
                         }
                         if (mPriv->glview->texture) {

@@ -1,5 +1,5 @@
 #include "AAC.h"
-#include <stdio.h>
+#include "Log.h"
 
 AAC::AAC()
     : mInited(false)
@@ -23,7 +23,7 @@ void AAC::decode(const uint8_t* data, size_t size, uint64_t pts)
     if (!mInited) {
         char err = NeAACDecInit(mAAC, const_cast<uint8_t*>(data), size, &samplerate, &channels);
         if (err != 0) {
-            printf("aac init error %d\n", err);
+            log::stderr("aac init error %\n", err);
             return;
         }
         mInited = true;
@@ -40,7 +40,7 @@ void AAC::decode(const uint8_t* data, size_t size, uint64_t pts)
 
         output = NeAACDecDecode(mAAC, &info, const_cast<uint8_t*>(cur), rem);
         if (info.error != 0) {
-            printf("error decoding aac %d %s with rem %zu\n", info.error, NeAACDecGetErrorMessage(info.error), rem);
+            log::stderr("error decoding aac % % with rem %\n", info.error, NeAACDecGetErrorMessage(info.error), rem);
             return;
         }
 
@@ -48,7 +48,7 @@ void AAC::decode(const uint8_t* data, size_t size, uint64_t pts)
             break;
         }
 
-        //printf("decoded %lu samples\n", info.samples);
+        //log::stdout("decoded % samples\n", info.samples);
         mSamples(output, info.samples, BytesPerSample, pts);
 
         cur += info.bytesconsumed;

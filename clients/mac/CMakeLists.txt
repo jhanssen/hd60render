@@ -17,7 +17,7 @@ add_library(faad2 STATIC IMPORTED)
 set_target_properties(faad2 PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/faad2/lib/libfaad.a)
 add_dependencies(faad2 faad2build)
 
-set(SOURCES main.cpp Renderer.cpp Demuxer.cpp View.mm AAC.cpp h264_bit_reader.cc h264_parser.cc)
+set(SOURCES main.cpp Renderer.cpp Demuxer.cpp View.mm AAC.cpp Log.cpp h264_bit_reader.cc h264_parser.cc)
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -std=c++17)
 
 find_library(FOUNDATION_LIBRARY Foundation)
