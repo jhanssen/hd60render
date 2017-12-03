@@ -259,7 +259,7 @@ void Renderer::createDecoder(const TSDemux::STREAM_PKT& pkt)
                                                                  &mVideoFormat);
 
     if (status == noErr) {
-        log::stderr("format descr created!\n");
+        log::stdout("format descr created!\n");
         // Set the pixel attributes for the destination buffer
         CFMutableDictionaryRef destinationPixelBufferAttributes = CFDictionaryCreateMutable(
             NULL, // CFAllocatorRef allocator

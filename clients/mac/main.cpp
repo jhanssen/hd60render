@@ -32,15 +32,16 @@ int main(int argc, char** argv)
     } else {
         renderOptions.port = 5198;
     }
-    if (options.enabled("&verbose")) {
-        log::addSink(
-            [](const std::string& msg) {
+    const bool verbose = options.enabled("&verbose");
+    log::addSink(
+        [verbose](const std::string& msg) {
+            if (verbose) {
                 std::fprintf(stdout, "%s", msg.c_str());
-            },
-            [](const std::string& msg) {
-                std::fprintf(stderr, "%s", msg.c_str());
-            });
-    }
+            }
+        },
+        [](const std::string& msg) {
+            std::fprintf(stderr, "%s", msg.c_str());
+        });
 
     Renderer renderer(renderOptions);
     View view(&renderer);
