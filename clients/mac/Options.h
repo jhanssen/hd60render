@@ -3,6 +3,7 @@
 
 #include <string>
 #include <variant>
+#include <vector>
 #include <stdexcept>
 #include <exception>
 #include <unordered_map>
@@ -94,6 +95,9 @@ Options::Options(int argc, char** argv)
     // 5. any other arguments are stand-alone arguments
     // 6. any arguments after -- are always stand-alone arguments
 
+    bool dashdash = false;
+    std::string hadopt;
+
     auto makeValue = [](const std::string& valstr) -> Value {
         // empty values are true booleans
         if (valstr.empty()) {
@@ -117,8 +121,31 @@ Options::Options(int argc, char** argv)
         return Value{valstr};
     };
 
-    bool dashdash = false;
-    std::string hadopt;
+    auto handleOption = [&makeValue, &hadopt, this](const std::string& optstr,
+                                                    const std::optional<std::string> valstr) {
+        if (!hadopt.empty()) {
+            values[hadopt] = Value{true};
+            hadopt.clear();
+        }
+
+        // do we start with "no-"? if so then we're disabled
+        if (optstr.substr(0, 3) == "no-") {
+            Value v = makeValue(valstr.value_or(std::string()));
+            bool* bv = std::get_if<bool>(&v);
+            if (!bv) {
+                // bad option
+                return;
+            }
+            values[optstr.substr(3)] = Value{!*bv};
+        } else {
+            if (valstr) {
+                values[optstr] = makeValue(*valstr);
+            } else {
+                hadopt = optstr;
+            }
+        }
+    };
+
     for (int i = 1; i < argc; ++i) {
         if (dashdash) {
             standaloneValues.standalones.push_back(argv[i]);
@@ -151,20 +178,21 @@ Options::Options(int argc, char** argv)
                         // bad option
                         continue;
                     }
-                    // do we start with "no-"? if so then we're disabled
-                    if (optstr.substr(0, 3) == "no-") {
-                        Value v = makeValue(valstr);
-                        bool* bv = std::get_if<bool>(&v);
-                        if (!bv) {
-                            // bad option
-                            continue;
+                    if (idx == 1) {
+                        // single dash, potentially multiple options
+                        if (eqpos != std::string::npos) {
+                            // special case, just take the first option if we have an equal value
+                            handleOption(optstr.substr(0, 1), valstr);
+                        } else {
+                            for (size_t o = 0; o < optstr.size(); ++o) {
+                                handleOption(optstr.substr(o, 1), {});
+                            }
                         }
-                        values[optstr.substr(3)] = Value{!*bv};
                     } else {
                         if (eqpos != std::string::npos) {
-                            values[optstr] = makeValue(valstr);
+                            handleOption(optstr, valstr);
                         } else {
-                            hadopt = optstr;
+                            handleOption(optstr, {});
                         }
                     }
                 }
