@@ -89,11 +89,12 @@ Options::Values::const_iterator Options::Option::find(const Values& values) cons
 Options::Options(int argc, char** argv)
 {
     // 1. any argument starting with '-' is an option
-    // 2. if the argument contains an = then what comes after is the value for the option
-    // 3. if the next argument after an option starts with '-' then that is also an option
-    // 4. if the next argument after an option does not start with '-' then that is the value for the option
-    // 5. any other arguments are stand-alone arguments
-    // 6. any arguments after -- are always stand-alone arguments
+    // 2. if the option is preceeded by a single '-' then any characters in the argument string is a separate option
+    // 3. if the argument contains an = then what comes after is the value for the option
+    // 4. if the next argument after an option starts with '-' then that is also an option
+    // 5. if the next argument after an option does not start with '-' then that is the value for the option
+    // 6. any other arguments are stand-alone arguments
+    // 7. any arguments after -- are always stand-alone arguments
 
     bool dashdash = false;
     std::string hadopt;
@@ -168,7 +169,7 @@ Options::Options(int argc, char** argv)
                         continue;
                     }
                     std::string optstr = argv[i] + idx, valstr;
-                    // do we have an '='? if so then that's our value, otherwise our value is 'true'
+                    // do we have an '='? if so then that's our value, otherwise our value is 'true' or the next argument
                     const size_t eqpos = optstr.find('=');
                     if (eqpos != std::string::npos) {
                         valstr = optstr.substr(eqpos + 1);
