@@ -21,17 +21,13 @@ int main(int argc, char** argv)
     Renderer::Options renderOptions;
 
     const Options options = Options::parse(argc, argv);
-    if (options.has<std::string>("&host")) {
-        renderOptions.host = options.value<std::string>("&host");
+    if (auto host = options.get<std::string>("&host")) {
+        renderOptions.host = *host;
     } else {
         std::printf("Need to pass --host name\n");
         return 1;
     }
-    if (options.has<int>("&port")) {
-        renderOptions.port = options.value<int>("&port");
-    } else {
-        renderOptions.port = 5198;
-    }
+    renderOptions.port = options.get<int>("&port", 5198);
     const bool verbose = options.enabled("&verbose");
     Log::addSink(
         [verbose](const std::string& msg) {

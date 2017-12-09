@@ -4,8 +4,9 @@
 #include <string>
 #include <variant>
 #include <vector>
-#include <stdexcept>
+#include <optional>
 #include <exception>
+#include <type_traits>
 #include <unordered_map>
 #include <cstdlib>
 
@@ -17,21 +18,31 @@ public:
     static Options parse(int argc, char** argv);
 
     bool enabled(const char* arg) const;
+
     bool has(const char* arg) const;
     template<typename Type>
     bool has(const char* arg) const;
-    Value value(const char* arg) const;
+
+    std::optional<Value> get(const char* arg) const;
     template<typename Type>
-    Type value(const char* arg) const;
+    std::optional<Type> get(const char* arg) const;
+
+    Value get(const char* arg, const Value& defaultValue) const;
+    template<typename Type,
+             typename std::enable_if<std::is_arithmetic<Type>::value, Type>::type = 0>
+    Type get(const char* arg, Type defaultValue) const;
+    template<typename Type,
+             typename std::enable_if<!std::is_arithmetic<Type>::value, Type>::type = 0>
+    Type get(const char* arg, const Type& defaultValue) const;
 
     struct Standalones
     {
         size_t size() const;
         template<typename Type>
         bool is(size_t idx) const;
-        Value at(size_t idx) const;
+        std::optional<Value> at(size_t idx) const;
         template<typename Type>
-        Type at(size_t idx) const;
+        std::optional<Type> at(size_t idx) const;
 
     private:
         Standalones() { }
@@ -241,29 +252,72 @@ bool Options::has<int>(const char* arg) const
     return has<long long int>(arg);
 }
 
-Options::Value Options::value(const char* arg) const
+std::optional<Options::Value> Options::get(const char* arg) const
 {
     Option opt(arg);
     auto v = opt.find(values);
     if (v == values.end())
-        std::throw_with_nested(std::runtime_error("no such value"));
+        return {};
     return v->second;
 }
 
 template<typename Type>
-Type Options::value(const char* arg) const
+std::optional<Type> Options::get(const char* arg) const
 {
     Option opt(arg);
     auto v = opt.find(values);
     if (v == values.end())
-        std::throw_with_nested(std::runtime_error("no such value"));
-    return std::get<Type>(v->second);
+        return {};
+    if (const Type* ptr = std::get_if<Type>(&v->second))
+        return *ptr;
+    return {};
 }
 
 template<>
-int Options::value<int>(const char* arg) const
+std::optional<int> Options::get<int>(const char* arg) const
 {
-    return static_cast<int>(value<long long int>(arg));
+    return get<long long int>(arg);
+}
+
+Options::Value Options::get(const char* arg, const Value& defaultValue) const
+{
+    Option opt(arg);
+    auto v = opt.find(values);
+    if (v == values.end())
+        return defaultValue;
+    return v->second;
+}
+
+template<typename Type,
+         typename std::enable_if<std::is_arithmetic<Type>::value, Type>::type = 0>
+Type Options::get(const char* arg, Type defaultValue) const
+{
+    Option opt(arg);
+    auto v = opt.find(values);
+    if (v == values.end())
+        return defaultValue;
+    if (const Type* ptr = std::get_if<Type>(&v->second))
+        return *ptr;
+    return defaultValue;
+}
+
+template<typename Type,
+         typename std::enable_if<!std::is_arithmetic<Type>::value, Type>::type = 0>
+Type Options::get(const char* arg, const Type& defaultValue) const
+{
+    Option opt(arg);
+    auto v = opt.find(values);
+    if (v == values.end())
+        return defaultValue;
+    if (const Type* ptr = std::get_if<Type>(&v->second))
+        return *ptr;
+    return defaultValue;
+}
+
+template<>
+int Options::get<int>(const char* arg, int defaultValue) const
+{
+    return get<long long int>(arg, defaultValue);
 }
 
 bool Options::enabled(const char* arg) const
@@ -291,21 +345,27 @@ bool Options::Standalones::is(size_t idx) const
     return std::holds_alternative<Type>(standalones[idx]);
 }
 
-Options::Value Options::Standalones::at(size_t idx) const
+std::optional<Options::Value> Options::Standalones::at(size_t idx) const
 {
+    if (idx >= standalones.size())
+        return {};
     return standalones[idx];
 }
 
 template<typename Type>
-Type Options::Standalones::at(size_t idx) const
+std::optional<Type> Options::Standalones::at(size_t idx) const
 {
-    return std::get<Type>(standalones[idx]);
+    if (idx >= standalones.size())
+        return {};
+    if (const Type* ptr = std::get_if<Type>(&standalones[idx]))
+        return *ptr;
+    return {};
 }
 
 template<>
-int Options::Standalones::at<int>(size_t idx) const
+std::optional<int> Options::Standalones::at<int>(size_t idx) const
 {
-    return static_cast<int>(std::get<long long int>(standalones[idx]));
+    return at<long long int>(idx);
 }
 
 #endif
