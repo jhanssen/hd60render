@@ -38,11 +38,21 @@ public:
     struct Standalones
     {
         size_t size() const;
+
         template<typename Type>
         bool is(size_t idx) const;
+
         std::optional<Value> at(size_t idx) const;
         template<typename Type>
         std::optional<Type> at(size_t idx) const;
+
+        Value at(size_t idx, const Value& defaultValue) const;
+        template<typename Type,
+                 typename std::enable_if<std::is_arithmetic<Type>::value, Type>::type = 0>
+        Type at(size_t idx, Type defaultValue) const;
+        template<typename Type,
+                 typename std::enable_if<!std::is_arithmetic<Type>::value, Type>::type = 0>
+        Type at(size_t idx, const Type& defaultValue) const;
 
     private:
         Standalones() { }
@@ -51,7 +61,7 @@ public:
 
         friend class Options;
     };
-    const Standalones& standalones() { return standaloneValues; }
+    const Standalones& standalones() const { return standaloneValues; }
 
 private:
     typedef std::unordered_map<std::string, Value> Values;
@@ -160,7 +170,7 @@ Options::Options(int argc, char** argv)
 
     for (int i = 1; i < argc; ++i) {
         if (dashdash) {
-            standaloneValues.standalones.push_back(argv[i]);
+            standaloneValues.standalones.push_back(makeValue(argv[i]));
         } else {
             if (argv[i][0] == '-') {
                 if (!hadopt.empty()) {
@@ -210,7 +220,7 @@ Options::Options(int argc, char** argv)
                 }
             } else {
                 if (hadopt.empty()) {
-                    standaloneValues.standalones.push_back(argv[i]);
+                    standaloneValues.standalones.push_back(makeValue(argv[i]));
                 } else {
                     values[hadopt] = makeValue(argv[i]);
                     hadopt.clear();
@@ -366,6 +376,41 @@ template<>
 std::optional<int> Options::Standalones::at<int>(size_t idx) const
 {
     return at<long long int>(idx);
+}
+
+Options::Value Options::Standalones::at(size_t idx, const Value& defaultValue) const
+{
+    if (idx >= standalones.size())
+        return defaultValue;
+    return standalones[idx];
+}
+
+template<typename Type,
+         typename std::enable_if<std::is_arithmetic<Type>::value, Type>::type = 0>
+Type Options::Standalones::at(size_t idx, Type defaultValue) const
+{
+    if (idx >= standalones.size())
+        return defaultValue;
+    if (const Type* ptr = std::get_if<Type>(&standalones[idx]))
+        return *ptr;
+    return defaultValue;
+}
+
+template<typename Type,
+         typename std::enable_if<!std::is_arithmetic<Type>::value, Type>::type = 0>
+Type Options::Standalones::at(size_t idx, const Type& defaultValue) const
+{
+    if (idx >= standalones.size())
+        return defaultValue;
+    if (const Type* ptr = std::get_if<Type>(&standalones[idx]))
+        return *ptr;
+    return defaultValue;
+}
+
+template<>
+int Options::Standalones::at<int>(size_t idx, int defaultValue) const
+{
+    return at<long long int>(idx, defaultValue);
 }
 
 #endif
